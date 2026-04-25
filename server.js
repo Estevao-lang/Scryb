@@ -1,3 +1,13 @@
+// Write startup log so we can diagnose failures in the packaged app
+try {
+  const _fs = require("fs");
+  const _logPath = require("path").join(process.env.USER_DATA_PATH || __dirname, "server-startup.log");
+  const _log = (m) => _fs.appendFileSync(_logPath, `[${new Date().toISOString()}] ${m}\n`);
+  _log(`server.js starting, __dirname=${__dirname}`);
+  process.on("uncaughtException", (e) => { _log(`UNCAUGHT: ${e.stack}`); process.exit(1); });
+  process.on("unhandledRejection", (e) => { _log(`UNHANDLED: ${e}`); });
+} catch {}
+
 require("dotenv").config({ path: require("path").join(__dirname, ".env") });
 const express = require("express");
 const multer = require("multer");
@@ -12,11 +22,12 @@ const app = express();
 app.use(express.json());
 const port = process.env.PORT || 3000;
 
-const storageDir = path.join(__dirname, "storage");
+// In Electron, USER_DATA_PATH is set to app.getPath("userData") — writable by the user.
+// Fall back to a local "storage" folder when running standalone (dev / Render).
+const userDataDir = process.env.USER_DATA_PATH || path.join(__dirname, "storage");
+const storageDir = userDataDir;
 const uploadDir = path.join(storageDir, "uploads");
 const jobsFile = path.join(storageDir, "jobs.json");
-// When running inside Electron, USER_DATA_PATH is the app's userData folder
-const userDataDir = process.env.USER_DATA_PATH || storageDir;
 const settingsFile = path.join(userDataDir, "settings.json");
 // Use os.tmpdir() to guarantee a path without special characters for whisper-cli
 const audioDir = path.join(os.tmpdir(), "whisper-transcricao");
