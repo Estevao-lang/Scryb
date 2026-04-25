@@ -444,7 +444,7 @@ const upload = multer({
 
 // ── Routes ────────────────────────────────────────────────────
 
-app.use(express.static("public"));
+app.use(express.static("public", { etag: false, maxAge: 0 }));
 
 app.get("/api/settings", (req, res) => {
   const key = process.env.GROQ_API_KEY || "";

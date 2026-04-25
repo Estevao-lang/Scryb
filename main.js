@@ -6,6 +6,9 @@ const PORT = process.env.PORT || 3000;
 const BASE_URL = `http://localhost:${PORT}`;
 const ICON_PATH = path.join(__dirname, "public", "icon.png");
 
+// utilityProcess.fork cannot load files from inside .asar — use the unpacked path
+const appDir = __dirname.replace("app.asar", "app.asar.unpacked");
+
 // Generate the icon PNG on first run if it doesn't exist yet
 if (!fs.existsSync(ICON_PATH)) {
   try { require("./scripts/generate-icon.js"); } catch (e) { /* non-fatal */ }
@@ -21,7 +24,7 @@ let recorderProcess = null;
 const startServer = () =>
   new Promise((resolve, reject) => {
     // utilityProcess.fork is the correct Electron API for running Node.js scripts
-    serverProcess = utilityProcess.fork(path.join(__dirname, "server.js"), [], {
+    serverProcess = utilityProcess.fork(path.join(appDir, "server.js"), [], {
       env: { ...process.env, PORT: String(PORT), USER_DATA_PATH: app.getPath("userData") },
       stdio: "inherit"
     });
@@ -121,7 +124,7 @@ const createTray = () => {
 // ── App lifecycle ─────────────────────────────────────────────
 
 const startRecorder = () => {
-  recorderProcess = utilityProcess.fork(path.join(__dirname, "recorder.js"), [], {
+  recorderProcess = utilityProcess.fork(path.join(appDir, "recorder.js"), [], {
     env: { ...process.env, USER_DATA_PATH: app.getPath("userData") },
     stdio: "inherit"
   });

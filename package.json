@@ -46,6 +46,15 @@
       "!node_modules/electron/**/*",
       "!node_modules/electron-builder/**/*"
     ],
+    "asarUnpack": [
+      "server.js",
+      "recorder.js",
+      "node_modules/ffmpeg-static/**/*",
+      "node_modules/opusscript/**/*",
+      "node_modules/@discordjs/**/*",
+      "node_modules/discord.js/**/*",
+      "node_modules/prism-media/**/*"
+    ],
     "extraResources": [
       {
         "from": "vendor",
