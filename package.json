@@ -49,11 +49,7 @@
     "asarUnpack": [
       "server.js",
       "recorder.js",
-      "node_modules/ffmpeg-static/**/*",
-      "node_modules/opusscript/**/*",
-      "node_modules/@discordjs/**/*",
-      "node_modules/discord.js/**/*",
-      "node_modules/prism-media/**/*"
+      "node_modules/**/*"
     ],
     "extraResources": [
       {
