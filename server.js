@@ -457,6 +457,11 @@ const upload = multer({
 
 app.use(express.static("public", { etag: false, maxAge: 0 }));
 
+// Landing page at root, app at /app
+const publicDir = path.resolve(__dirname, "public");
+app.get("/", (req, res) => res.sendFile(path.join(publicDir, "home.html")));
+app.get("/app", (req, res) => res.sendFile(path.join(publicDir, "index.html")));
+
 app.get("/api/settings", (req, res) => {
   const key = process.env.GROQ_API_KEY || "";
   const token = process.env.DISCORD_BOT_TOKEN || "";

@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scryb — Your call. In text. Now.</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <style>
+    /* ── Landing-only styles ── */
+    .land-nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 40px;
+      height: 64px;
+      background: rgba(7,7,15,0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(108,82,255,0.12);
+    }
+    .land-nav-logo { display: flex; align-items: center; gap: 10px; }
+    .land-nav-logo img { height: 28px; }
+    .land-nav-links { display: flex; align-items: center; gap: 12px; }
+    .land-nav-link {
+      color: var(--muted);
+      font-size: 0.85rem;
+      font-weight: 500;
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 999px;
+      transition: color .2s;
+    }
+    .land-nav-link:hover { color: var(--text); }
+    .land-nav-cta {
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-decoration: none;
+      padding: 8px 20px;
+      border-radius: 999px;
+      transition: opacity .2s;
+    }
+    .land-nav-cta:hover { opacity: .85; }
+
+    /* ── Hero ── */
+    .land-hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 100px 24px 80px;
+      position: relative;
+    }
+    .land-hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 70% 50% at 50% 0%, rgba(124,92,252,0.18) 0%, transparent 65%),
+        radial-gradient(ellipse 40% 30% at 80% 80%, rgba(0,212,255,0.08) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .land-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(124,92,252,0.12);
+      border: 1px solid rgba(124,92,252,0.3);
+      color: #a78bfa;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      padding: 5px 14px;
+      border-radius: 999px;
+      margin-bottom: 28px;
+    }
+    .land-badge-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #a78bfa;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50% { opacity:.4; transform:scale(1.4); }
+    }
+    .land-h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(2.8rem, 7vw, 5.5rem);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -.02em;
+      margin: 0 0 20px;
+      color: var(--text);
+    }
+    .land-h1 span { color: var(--accent2); }
+    .land-sub {
+      font-size: clamp(1rem, 2vw, 1.2rem);
+      color: var(--muted);
+      max-width: 520px;
+      line-height: 1.6;
+      margin: 0 auto 40px;
+    }
+    .land-cta-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .land-btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: linear-gradient(135deg, #7c5cfc, #4a2fcf);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      text-decoration: none;
+      padding: 14px 32px;
+      border-radius: 999px;
+      box-shadow: 0 8px 32px rgba(124,92,252,0.35);
+      transition: transform .2s, box-shadow .2s;
+    }
+    .land-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(124,92,252,0.5); }
+    .land-btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--text);
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      padding: 14px 28px;
+      border-radius: 999px;
+      transition: background .2s;
+    }
+    .land-btn-secondary:hover { background: rgba(255,255,255,0.1); }
+    .land-trust {
+      margin-top: 24px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .land-trust-item { display: flex; align-items: center; gap: 5px; }
+    .land-trust-item svg { color: var(--ok); }
+
+    /* ── Features strip ── */
+    .land-features {
+      display: flex;
+      justify-content: center;
+      gap: 0;
+      border-top: 1px solid var(--panel-border);
+      border-bottom: 1px solid var(--panel-border);
+      background: rgba(12,12,24,0.6);
+      overflow: hidden;
+    }
+    .land-feat {
+      flex: 1;
+      min-width: 160px;
+      padding: 28px 24px;
+      text-align: center;
+      border-right: 1px solid var(--panel-border);
+    }
+    .land-feat:last-child { border-right: none; }
+    .land-feat-icon { font-size: 1.5rem; margin-bottom: 8px; }
+    .land-feat-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 4px; }
+    .land-feat-desc { font-size: 0.78rem; color: var(--muted); line-height: 1.5; }
+
+    /* ── Section ── */
+    .land-section {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 96px 24px;
+    }
+    .land-section-label {
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+    .land-section-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 800;
+      line-height: 1.1;
+      margin: 0 0 16px;
+    }
+    .land-section-desc {
+      font-size: 1rem;
+      color: var(--muted);
+      line-height: 1.7;
+      max-width: 560px;
+      margin-bottom: 56px;
+    }
+
+    /* ── Tutorial steps ── */
+    .tut-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      position: relative;
+    }
+    .tut-steps::before {
+      content: '';
+      position: absolute;
+      left: 27px;
+      top: 28px;
+      bottom: 28px;
+      width: 2px;
+      background: linear-gradient(to bottom, var(--accent), var(--accent2));
+      opacity: .25;
+    }
+    .tut-step {
+      display: flex;
+      gap: 24px;
+      padding: 28px 0;
+      position: relative;
+    }
+    .tut-step + .tut-step { border-top: 1px solid rgba(108,82,255,0.08); }
+    .tut-num {
+      flex-shrink: 0;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(124,92,252,0.2), rgba(0,212,255,0.1));
+      border: 1px solid rgba(124,92,252,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: var(--accent);
+      position: relative;
+      z-index: 1;
+    }
+    .tut-body { flex: 1; padding-top: 12px; }
+    .tut-title { font-weight: 700; font-size: 1.05rem; margin-bottom: 6px; }
+    .tut-desc { color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
+    .tut-desc a { color: var(--accent2); text-decoration: none; font-weight: 600; }
+    .tut-desc a:hover { text-decoration: underline; }
+    .tut-tag {
+      display: inline-block;
+      background: rgba(0,229,160,0.1);
+      border: 1px solid rgba(0,229,160,0.25);
+      color: var(--ok);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 10px;
+      border-radius: 999px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+    .tut-screenshot {
+      margin-top: 16px;
+      border-radius: 12px;
+      border: 1px solid var(--panel-border);
+      background: rgba(12,12,24,0.8);
+      padding: 16px 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+    .tut-screenshot .hl { color: var(--accent2); font-weight: 700; }
+    .tut-screenshot .ok { color: var(--ok); }
+
+    /* ── How it works ── */
+    .hiw-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+    }
+    .hiw-card {
+      background: rgba(12,12,24,0.8);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      transition: border-color .2s, transform .2s;
+    }
+    .hiw-card:hover { border-color: rgba(124,92,252,0.4); transform: translateY(-3px); }
+    .hiw-icon { font-size: 2rem; margin-bottom: 14px; }
+    .hiw-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 6px; }
+    .hiw-desc { font-size: 0.82rem; color: var(--muted); line-height: 1.6; }
+    .hiw-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(124,92,252,0.3);
+      font-size: 1.5rem;
+      align-self: center;
+    }
+
+    /* ── CTA bottom ── */
+    .land-cta-bottom {
+      text-align: center;
+      padding: 80px 24px;
+      border-top: 1px solid var(--panel-border);
+      background: radial-gradient(ellipse 60% 80% at 50% 100%, rgba(124,92,252,0.1) 0%, transparent 70%);
+    }
+    .land-cta-bottom h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 800;
+      margin: 0 0 12px;
+    }
+    .land-cta-bottom p { color: var(--muted); margin: 0 0 32px; font-size: 1rem; }
+
+    /* ── Footer ── */
+    .land-footer {
+      text-align: center;
+      padding: 24px;
+      border-top: 1px solid rgba(108,82,255,0.08);
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .land-footer a { color: var(--muted); text-decoration: none; }
+    .land-footer a:hover { color: var(--text); }
+
+    @media (max-width: 600px) {
+      .land-nav { padding: 0 20px; }
+      .land-features { flex-wrap: wrap; }
+      .land-feat { min-width: 50%; border-bottom: 1px solid var(--panel-border); }
+      .tut-steps::before { left: 20px; }
+      .tut-num { width: 42px; height: 42px; font-size: 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav class="land-nav">
+    <div class="land-nav-logo">
+      <img src="/logo.svg" alt="scryb" />
+    </div>
+    <div class="land-nav-links">
+      <a href="#how-it-works" class="land-nav-link">How it works</a>
+      <a href="#get-started" class="land-nav-link">Get started</a>
+      <a href="/app" class="land-nav-cta">Open app →</a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="land-hero">
+    <div class="land-badge">
+      <span class="land-badge-dot"></span>
+      Free · Private · AI-powered
+    </div>
+    <h1 class="land-h1">Your call.<br>In text. <span>Now.</span></h1>
+    <p class="land-sub">Upload audio files or record Discord calls directly. Get accurate transcriptions in seconds — powered by Groq Whisper.</p>
+    <div class="land-cta-row">
+      <a href="/app" class="land-btn-primary">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Start transcribing
+      </a>
+      <a href="#get-started" class="land-btn-secondary">
+        Get your free API key
+      </a>
+    </div>
+    <div class="land-trust">
+      <span class="land-trust-item">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        Free forever
+      </span>
+      <span class="land-trust-item">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        No credit card
+      </span>
+      <span class="land-trust-item">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        Your key, your data
+      </span>
+      <span class="land-trust-item">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        50+ languages
+      </span>
+    </div>
+  </section>
+
+  <!-- Features strip -->
+  <div class="land-features">
+    <div class="land-feat">
+      <div class="land-feat-icon">⚡</div>
+      <div class="land-feat-title">Blazing fast</div>
+      <div class="land-feat-desc">1 hour of audio transcribed in under 60 seconds</div>
+    </div>
+    <div class="land-feat">
+      <div class="land-feat-icon">🔒</div>
+      <div class="land-feat-title">Private</div>
+      <div class="land-feat-desc">Your API key never touches our servers</div>
+    </div>
+    <div class="land-feat">
+      <div class="land-feat-icon">🎙️</div>
+      <div class="land-feat-title">Discord ready</div>
+      <div class="land-feat-desc">Record multi-track voice calls automatically</div>
+    </div>
+    <div class="land-feat">
+      <div class="land-feat-icon">🌍</div>
+      <div class="land-feat-title">Multilingual</div>
+      <div class="land-feat-desc">Portuguese, English, Spanish and 50+ more</div>
+    </div>
+  </div>
+
+  <!-- How it works -->
+  <section class="land-section" id="how-it-works">
+    <div class="land-section-label">How it works</div>
+    <h2 class="land-section-title">Simple as<br>upload → transcribe</h2>
+    <p class="land-section-desc">No account needed. Paste your Groq API key once and transcribe unlimited audio.</p>
+    <div class="hiw-grid">
+      <div class="hiw-card">
+        <div class="hiw-icon">🔑</div>
+        <div class="hiw-title">1. Get your free key</div>
+        <div class="hiw-desc">Create a free Groq account and generate an API key in 30 seconds. No credit card required.</div>
+      </div>
+      <div class="hiw-card">
+        <div class="hiw-icon">📁</div>
+        <div class="hiw-title">2. Upload your audio</div>
+        <div class="hiw-desc">Drop MP3, WAV, M4A, MP4 or a Craig folder from your Discord recording bot.</div>
+      </div>
+      <div class="hiw-card">
+        <div class="hiw-icon">✨</div>
+        <div class="hiw-title">3. Get your transcript</div>
+        <div class="hiw-desc">Receive clean text in seconds. Copy, download as .txt or use speaker-separated format.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Get started / Tutorial -->
+  <section class="land-section" id="get-started" style="padding-top:0">
+    <div style="background:rgba(12,12,24,0.8);border:1px solid var(--panel-border);border-radius:24px;padding:48px;">
+      <div class="land-section-label">Get started in 2 minutes</div>
+      <h2 class="land-section-title" style="margin-bottom:8px">Get your free<br>Groq API Key</h2>
+      <p class="land-section-desc">Scryb uses Groq's Whisper API for transcription. It's completely free — no billing, no limits for normal use.</p>
+
+      <div class="tut-steps">
+
+        <div class="tut-step">
+          <div class="tut-num">1</div>
+          <div class="tut-body">
+            <div class="tut-title">Create a free Groq account <span class="tut-tag">FREE</span></div>
+            <div class="tut-desc">
+              Go to <a href="https://console.groq.com" target="_blank">console.groq.com</a> and sign up with Google or GitHub.
+              No credit card required — Groq offers a generous free tier for API usage.
+            </div>
+          </div>
+        </div>
+
+        <div class="tut-step">
+          <div class="tut-num">2</div>
+          <div class="tut-body">
+            <div class="tut-title">Open the API Keys page</div>
+            <div class="tut-desc">
+              After logging in, click <strong>"API Keys"</strong> in the left sidebar, or go directly to
+              <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a>.
+            </div>
+            <div class="tut-screenshot">
+              <span class="hl">console.groq.com</span><br>
+              ├── Playground<br>
+              ├── <span class="ok">→ API Keys</span> &nbsp;← click here<br>
+              ├── Models<br>
+              └── Usage
+            </div>
+          </div>
+        </div>
+
+        <div class="tut-step">
+          <div class="tut-num">3</div>
+          <div class="tut-body">
+            <div class="tut-title">Create a new API Key</div>
+            <div class="tut-desc">
+              Click the <strong>"Create API Key"</strong> button. Give it any name (e.g. "scryb").
+              Copy the key that appears — it starts with <code style="background:rgba(124,92,252,0.15);padding:2px 6px;border-radius:4px;font-size:0.85em">gsk_...</code>
+            </div>
+            <div class="tut-screenshot">
+              <span class="hl">+ Create API Key</span><br><br>
+              Name: <span class="ok">scryb</span><br>
+              Key:  <span class="ok">gsk_xxxxxxxxxxxxxxxxxxxx</span> ← copy this
+            </div>
+          </div>
+        </div>
+
+        <div class="tut-step">
+          <div class="tut-num">4</div>
+          <div class="tut-body">
+            <div class="tut-title">Paste it in Scryb Settings</div>
+            <div class="tut-desc">
+              Open the app, click the <strong>⚙️ settings icon</strong> in the top right, paste your key in the
+              <strong>"Groq API Key"</strong> field and click <strong>Save</strong>. You're done — start transcribing!
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div style="margin-top:40px;text-align:center">
+        <a href="/app" class="land-btn-primary" style="font-size:1.05rem;padding:16px 40px">
+          Open Scryb →
+        </a>
+        <p style="margin-top:16px;font-size:0.82rem;color:var(--muted)">Already have a key? Jump straight in.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Bottom CTA -->
+  <div class="land-cta-bottom">
+    <h2>Ready to transcribe?</h2>
+    <p>Free, private, and takes 2 minutes to set up.</p>
+    <a href="/app" class="land-btn-primary" style="font-size:1.05rem;padding:16px 40px">
+      Start for free →
+    </a>
+  </div>
+
+  <!-- Footer -->
+  <footer class="land-footer">
+    <p>© 2025 scryb · Built by Estevão Gabriel · <a href="/app">Open app</a></p>
+  </footer>
+
+</body>
+</html>
