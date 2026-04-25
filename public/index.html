@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scryb — Audio Transcription</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  </head>
+  <body>
+    <!-- Settings modal -->
+    <div id="settings-overlay" class="settings-overlay" hidden>
+      <div class="settings-modal">
+        <div class="settings-header">
+          <h2>Settings</h2>
+          <button id="settings-close" class="icon-btn" aria-label="Close">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-label-row">
+            <label for="groq-key-input">Groq API Key</label>
+            <a class="settings-link" href="https://console.groq.com/keys" target="_blank">Get free API key →</a>
+          </div>
+          <div class="key-input-row">
+            <input id="groq-key-input" type="password" placeholder="gsk_..." autocomplete="off" spellcheck="false"/>
+            <button id="key-toggle" class="icon-btn" aria-label="Mostrar/ocultar">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <p class="settings-hint">Your key is stored locally on your machine. It is never sent to our servers.</p>
+          <div id="key-status" class="key-status"></div>
+        </div>
+
+        <div class="settings-section" style="margin-top:20px;padding-top:20px;border-top:1px solid var(--panel-border)">
+          <div class="settings-label-row">
+            <label for="discord-token-input">Discord Bot Token</label>
+            <a class="settings-link" href="https://discord.com/developers/applications" target="_blank">Create bot →</a>
+          </div>
+          <div class="key-input-row">
+            <input id="discord-token-input" type="password" placeholder="MTA..." autocomplete="off" spellcheck="false"/>
+            <button id="discord-token-toggle" class="icon-btn" aria-label="Show/hide token">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <p class="settings-hint">Required for the Record tab. Enable <strong>Server Members</strong> and <strong>Voice States</strong> intents in the Developer Portal.</p>
+          <div id="discord-token-status" class="key-status"></div>
+        </div>
+
+        <div class="settings-footer">
+          <button id="settings-save" class="btn-primary">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Onboarding overlay (first run) -->
+    <div id="onboarding-overlay" class="onboarding-overlay" hidden>
+      <div class="onboarding-modal">
+
+        <!-- Step 0: Welcome -->
+        <div class="ob-step active" id="ob-step-0">
+          <div class="ob-icon-big">🎙️</div>
+          <h2 class="ob-title">Welcome to Scryb</h2>
+          <p class="ob-desc">Record Discord calls and get instant transcriptions powered by AI.<br>Setup takes <strong>2 minutes</strong> and everything is <strong>free</strong>.</p>
+          <div class="ob-steps-dots">
+            <span class="ob-dot active"></span>
+            <span class="ob-dot"></span>
+            <span class="ob-dot"></span>
+          </div>
+          <button class="btn-primary ob-next" data-next="1">Let's go →</button>
+        </div>
+
+        <!-- Step 1: Groq API Key -->
+        <div class="ob-step" id="ob-step-1" hidden>
+          <div class="ob-badge">Step 1 of 2</div>
+          <div class="ob-icon-big">⚡</div>
+          <h2 class="ob-title">Groq API Key</h2>
+          <p class="ob-desc">Scryb uses Groq's Whisper to transcribe audio.<br>It's <strong>free</strong> — no credit card needed.</p>
+          <div class="ob-instruction">
+            <div class="ob-step-item"><span class="ob-num">1</span> Go to <a href="https://console.groq.com/keys" target="_blank" class="ob-link">console.groq.com/keys</a></div>
+            <div class="ob-step-item"><span class="ob-num">2</span> Click <strong>"Create API Key"</strong></div>
+            <div class="ob-step-item"><span class="ob-num">3</span> Copy and paste below</div>
+          </div>
+          <div class="ob-input-row">
+            <input id="ob-groq-input" type="password" placeholder="gsk_..." autocomplete="off" spellcheck="false" class="ob-input"/>
+            <button id="ob-groq-toggle" class="icon-btn ob-eye">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <div id="ob-groq-status" class="ob-status"></div>
+          <div class="ob-steps-dots">
+            <span class="ob-dot"></span>
+            <span class="ob-dot active"></span>
+            <span class="ob-dot"></span>
+          </div>
+          <div class="ob-btn-row">
+            <button class="ob-skip" id="ob-groq-skip">Skip for now</button>
+            <button class="btn-primary" id="ob-groq-save">Save &amp; Continue →</button>
+          </div>
+        </div>
+
+        <!-- Step 2: Discord Bot Token -->
+        <div class="ob-step" id="ob-step-2" hidden>
+          <div class="ob-badge">Step 2 of 2</div>
+          <div class="ob-icon-big">🤖</div>
+          <h2 class="ob-title">Discord Bot Token</h2>
+          <p class="ob-desc">Optional — only needed to use the <strong>Record tab</strong>.<br>Lets Scryb join your voice channel and record.</p>
+          <div class="ob-instruction">
+            <div class="ob-step-item"><span class="ob-num">1</span> Go to <a href="https://discord.com/developers/applications" target="_blank" class="ob-link">discord.com/developers/applications</a></div>
+            <div class="ob-step-item"><span class="ob-num">2</span> New Application → <strong>Bot</strong> → Reset Token</div>
+            <div class="ob-step-item"><span class="ob-num">3</span> Enable <strong>Server Members</strong> + <strong>Voice States</strong> intents</div>
+            <div class="ob-step-item"><span class="ob-num">4</span> Copy and paste below</div>
+          </div>
+          <div class="ob-input-row">
+            <input id="ob-discord-input" type="password" placeholder="MTA..." autocomplete="off" spellcheck="false" class="ob-input"/>
+            <button id="ob-discord-toggle" class="icon-btn ob-eye">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <div id="ob-discord-status" class="ob-status"></div>
+          <div class="ob-steps-dots">
+            <span class="ob-dot"></span>
+            <span class="ob-dot"></span>
+            <span class="ob-dot active"></span>
+          </div>
+          <div class="ob-btn-row">
+            <button class="ob-skip" id="ob-discord-skip">Skip for now</button>
+            <button class="btn-primary" id="ob-discord-save">Finish setup →</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- First-run banner -->
+    <div id="setup-banner" class="setup-banner" hidden>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Set up your Groq API key to enable AI transcription.
+      <button id="banner-open-settings" class="banner-btn">Set up now</button>
+    </div>
+
+    <main class="page">
+      <section class="hero">
+        <div class="logo-row">
+          <img src="/logo.svg" alt="scryb" class="logo-svg" />
+          <button id="settings-btn" class="icon-btn settings-trigger" aria-label="Settings">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </button>
+        </div>
+        <h1>Your call.<br>In text.<br><span class="gradient-text">Now.</span></h1>
+        <p class="subtitle">
+          Import a Craig folder or individual files. AI-powered transcription — fast, free and private.
+        </p>
+      </section>
+
+      <section class="panel">
+        <!-- Tab switcher -->
+        <div class="tabs">
+          <button class="tab active" data-tab="transcribe">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Transcribe
+          </button>
+          <button class="tab" data-tab="record">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="6" fill="currentColor"/><circle cx="12" cy="12" r="10"/></svg>
+            Record
+          </button>
+        </div>
+
+        <!-- ── Transcribe tab ── -->
+        <div id="tab-transcribe" class="tab-panel active">
+        <form id="transcription-form" class="form">
+
+          <div class="upload-grid">
+            <div class="drop-zone" id="drop-files">
+              <div class="drop-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="12" y1="18" x2="12" y2="12"/>
+                  <line x1="9" y1="15" x2="15" y2="15"/>
+                </svg>
+              </div>
+              <div class="drop-text">
+                <strong>Individual files</strong>
+                <span id="files-label">Click to select</span>
+              </div>
+              <input
+                id="media"
+                name="media"
+                type="file"
+                accept=".flac,audio/*,video/mp4,video/webm,video/quicktime,video/x-m4v"
+                multiple
+              />
+            </div>
+
+            <div class="drop-zone" id="drop-craig">
+              <div class="drop-icon craig-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                  <line x1="12" y1="11" x2="12" y2="17"/>
+                  <line x1="9" y1="14" x2="15" y2="14"/>
+                </svg>
+              </div>
+              <div class="drop-text">
+                <strong>Craig folder</strong>
+                <span id="craig-label">Click to select</span>
+              </div>
+              <input
+                id="craig-folder"
+                name="craig-folder"
+                type="file"
+                webkitdirectory
+                directory
+                multiple
+              />
+            </div>
+          </div>
+
+          <div class="options-row">
+            <label class="field-label">
+              <span>Language</span>
+              <select id="language" name="language">
+                <option value="portuguese">🇧🇷 Português</option>
+                <option value="english">🇺🇸 English</option>
+                <option value="spanish">🇪🇸 Español</option>
+              </select>
+            </label>
+
+            <label class="field-label">
+              <span>Model</span>
+              <select id="model" name="model">
+                <option value="ggml-tiny.bin">Loading...</option>
+              </select>
+            </label>
+
+            <label class="field-label">
+              <span>Speed</span>
+              <select id="speed" name="speed">
+                <option value="fast">⚡ Fast</option>
+                <option value="normal">🎯 Quality</option>
+              </select>
+            </label>
+
+            <label class="field-label">
+              <span>Format</span>
+              <select id="output-format" name="outputFormat">
+                <option value="txt">Plain text</option>
+                <option value="timestamps">With timestamps</option>
+              </select>
+            </label>
+          </div>
+
+          <label class="field-label" style="grid-column: 1 / -1;">
+            <span>Context (optional)</span>
+            <input
+              id="context"
+              name="context"
+              type="text"
+              placeholder="e.g. Dev meeting, participant names, technical terms used..."
+              autocomplete="off"
+            />
+          </label>
+
+          <button id="submit-button" type="submit">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:8px;vertical-align:-2px">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            Transcribe
+          </button>
+        </form>
+
+        <div id="selection-summary" class="selection-summary">No files selected.</div>
+
+        <div id="progress-card" class="progress-card" hidden>
+          <div class="progress-meta">
+            <strong id="progress-label">Preparing transcription...</strong>
+            <span id="progress-percent">0%</span>
+          </div>
+          <div class="progress-bar" aria-hidden="true">
+            <div id="progress-fill" class="progress-fill"></div>
+          </div>
+          <div class="progress-details">
+            <span id="progress-files">0 of 0 files</span>
+            <span id="progress-eta">Estimating time remaining...</span>
+          </div>
+        </div>
+
+        <div id="status" class="status" aria-live="polite"></div>
+
+        <p class="hint">
+          In Craig mode, select the entire export folder. Incompatible files are automatically ignored.
+        </p>
+
+        <section class="result">
+          <div class="result-header">
+            <h2>Transcription</h2>
+            <div class="actions">
+              <button id="copy-button" type="button" disabled>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:-1px">
+                  <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+                Copy
+              </button>
+              <button id="download-button" type="button" disabled>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:-1px">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Download .txt
+              </button>
+            </div>
+          </div>
+          <textarea
+            id="result"
+            placeholder="Transcriptions will appear here, separated by file or Craig track."
+            readonly
+          ></textarea>
+        </section>
+        </div> <!-- /tab-transcribe -->
+
+        <!-- ── Record tab ── -->
+        <div id="tab-record" class="tab-panel" hidden>
+          <div class="record-setup" id="record-setup">
+            <div class="options-row">
+              <label class="field-label">
+                <span>Guild ID</span>
+                <input id="guild-id" type="text" placeholder="Right-click server → Copy Server ID" autocomplete="off"/>
+              </label>
+              <label class="field-label">
+                <span>Channel ID</span>
+                <input id="channel-id" type="text" placeholder="Right-click voice channel → Copy Channel ID" autocomplete="off"/>
+              </label>
+              <label class="field-label">
+                <span>Language</span>
+                <select id="rec-language">
+                  <option value="portuguese">🇧🇷 Português</option>
+                  <option value="english">🇺🇸 English</option>
+                  <option value="spanish">🇪🇸 Español</option>
+                </select>
+              </label>
+            </div>
+            <label class="field-label" style="margin-top:8px">
+              <span>Context (optional)</span>
+              <input id="rec-context" type="text" placeholder="e.g. Dev standup, participant names, technical terms..." autocomplete="off"/>
+            </label>
+            <div id="recorder-no-token" class="recorder-warning" hidden>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              Discord bot token not configured. <button class="inline-link" id="open-settings-from-rec">Open Settings →</button>
+            </div>
+            <button id="start-record-btn" class="btn-record" type="button">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>
+              Start Recording
+            </button>
+          </div>
+
+          <div class="record-live" id="record-live" hidden>
+            <div class="record-indicator">
+              <span class="rec-dot"></span>
+              <span id="rec-status-label">Recording</span>
+              <span id="rec-timer" class="rec-timer">00:00:00</span>
+            </div>
+            <div id="rec-participants" class="rec-participants"></div>
+            <button id="stop-record-btn" class="btn-stop" type="button">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+              Stop &amp; Transcribe
+            </button>
+          </div>
+
+          <div id="rec-result-area" style="margin-top:16px">
+            <div id="rec-progress-card" class="progress-card" hidden>
+              <div class="progress-meta">
+                <strong id="rec-progress-label">Transcribing recording...</strong>
+                <span id="rec-progress-percent">0%</span>
+              </div>
+              <div class="progress-bar"><div id="rec-progress-fill" class="progress-fill"></div></div>
+              <div class="progress-details">
+                <span id="rec-progress-files">0 of 0 tracks</span>
+                <span id="rec-progress-eta"></span>
+              </div>
+            </div>
+            <div id="rec-status" class="status" aria-live="polite"></div>
+            <section class="result" id="rec-result-section" style="display:none">
+              <div class="result-header">
+                <h2>Transcription</h2>
+                <div class="actions">
+                  <button id="rec-copy-btn" type="button">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:-1px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    Copy
+                  </button>
+                  <button id="rec-download-btn" type="button">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:-1px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Download .txt
+                  </button>
+                </div>
+              </div>
+              <textarea id="rec-result" readonly placeholder="Recording transcription will appear here."></textarea>
+            </section>
+          </div>
+        </div> <!-- /tab-record -->
+
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <a href="/about.html" target="_blank">How it works</a>
+      <span>·</span>
+      <span>scryb v1.0</span>
+    </footer>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

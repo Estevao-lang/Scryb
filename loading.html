@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <title>scryb</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #07070f;
+      color: #eaeaf5;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 24px;
+    }
+    .mark {
+      width: 56px; height: 56px;
+      background: linear-gradient(135deg, #7c5cfc, #4a2fcf);
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; font-weight: 800; color: #fff;
+      box-shadow: 0 8px 32px rgba(124,92,252,0.4);
+    }
+    .name {
+      font-size: 1.6rem; font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+    .dots {
+      display: flex; gap: 8px;
+    }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #7c5cfc;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    .dot:nth-child(2) { animation-delay: 0.2s; background: #9b7dfd; }
+    .dot:nth-child(3) { animation-delay: 0.4s; background: #00d4ff; }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.2; transform: scale(0.8); }
+      50%       { opacity: 1;   transform: scale(1); }
+    }
+    p { font-size: 0.85rem; color: #6060a0; }
+  </style>
+</head>
+<body>
+  <div class="mark">S</div>
+  <span class="name">scryb</span>
+  <div class="dots">
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+  </div>
+  <p>Starting...</p>
+</body>
+</html>

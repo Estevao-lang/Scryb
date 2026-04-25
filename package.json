@@ -1,0 +1,93 @@
+{
+  "name": "scryb",
+  "version": "1.0.0",
+  "description": "Fast, free and private audio transcription powered by Whisper and Groq AI",
+  "main": "main.js",
+  "scripts": {
+    "start": "node server.js",
+    "electron": "electron .",
+    "postinstall": "echo ok",
+    "build": "electron-builder --win --x64",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
+  },
+  "dependencies": {
+    "@discordjs/opus": "^0.10.0",
+    "@discordjs/voice": "^0.19.2",
+    "discord.js": "^14.26.3",
+    "dotenv": "^17.3.1",
+    "express": "^4.21.2",
+    "ffmpeg-static": "^5.3.0",
+    "multer": "^2.1.1",
+    "opusscript": "^0.0.8",
+    "prism-media": "^1.3.5"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.scryb.app",
+    "productName": "scryb",
+    "copyright": "© 2025 scryb",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "server.js",
+      "loading.html",
+      "error.html",
+      ".env",
+      "public/**/*",
+      "package.json",
+      "node_modules/**/*",
+      "!node_modules/electron/**/*",
+      "!node_modules/electron-builder/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "vendor",
+        "to": "vendor",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "storage",
+        "to": "storage",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "public/icon.png",
+      "shortcutName": "scryb"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "public/icon.png",
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "public/icon.png",
+      "category": "AudioVideo"
+    }
+  }
+}

@@ -1,0 +1,37 @@
+# Environment — never commit API keys
+.env
+
+# External repos (not part of this project)
+DeepSeek-V3/
+craig/
+
+# Claude Code local settings
+.claude/
+
+# Whisper binaries (Windows only, not needed on Render)
+vendor/
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Storage (jobs, uploads, settings)
+storage/
+!storage/.gitkeep
+
+# Temp audio files
+*.wav
+*.tmp
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Electron build artifacts
+out/

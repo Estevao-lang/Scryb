@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: scryb
+    runtime: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: GROQ_API_KEY
+        sync: false
+      - key: DISCORD_BOT_TOKEN
+        sync: false

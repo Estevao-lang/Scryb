@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>scryb — Error</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #07070f;
+      color: #eaeaf5;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 16px;
+    }
+    h2 { color: #ff4d6d; font-size: 1.1rem; }
+    p  { font-size: 0.85rem; color: #6060a0; max-width: 340px; text-align: center; line-height: 1.6; }
+    button {
+      margin-top: 8px;
+      padding: 10px 24px;
+      border: none;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #7c5cfc, #4a2fcf);
+      color: #fff;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h2>Failed to start server</h2>
+  <p>scryb could not start the internal server. Make sure port 3000 is available and try again.</p>
+  <button onclick="location.reload()">Try again</button>
+</body>
+</html>

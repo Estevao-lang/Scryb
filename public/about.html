@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>scryb — How it works</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #07070f;
+      --bg2: #0d0d1a;
+      --panel: rgba(12, 12, 24, 0.97);
+      --border: rgba(108, 82, 255, 0.18);
+      --text: #eaeaf5;
+      --muted: #6060a0;
+      --accent: #7c5cfc;
+      --accent2: #00d4ff;
+      --ok: #00e5a0;
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background:
+        radial-gradient(ellipse 60% 40% at 10% 0%, rgba(124,92,252,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 90% 100%, rgba(0,212,255,0.07) 0%, transparent 60%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 48px 24px 80px;
+    }
+
+    .wrap {
+      max-width: 760px;
+      margin: 0 auto;
+    }
+
+    /* Nav */
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 52px;
+    }
+    .nav img { height: 34px; filter: drop-shadow(0 4px 12px rgba(124,92,252,0.35)); }
+    .back-link {
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: color 160ms;
+    }
+    .back-link:hover { color: var(--text); }
+
+    /* Hero */
+    .page-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 2.4rem;
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 14px;
+      letter-spacing: -0.03em;
+    }
+    .page-title span {
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .page-lead {
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.65;
+      margin-bottom: 52px;
+      max-width: 560px;
+    }
+
+    /* Section */
+    .section { margin-bottom: 52px; }
+    .section-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent2);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      margin-bottom: 20px;
+    }
+    h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      letter-spacing: -0.02em;
+    }
+    p { color: var(--muted); line-height: 1.7; margin-bottom: 12px; }
+    p:last-child { margin-bottom: 0; }
+
+    /* Cards */
+    .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
+    @media (max-width: 560px) { .cards { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+    }
+    .card-icon {
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 14px;
+      font-size: 18px;
+    }
+    .card-icon.purple { background: rgba(124,92,252,0.15); color: var(--accent); }
+    .card-icon.cyan   { background: rgba(0,212,255,0.12);   color: var(--accent2); }
+    .card-icon.green  { background: rgba(0,229,160,0.12);   color: var(--ok); }
+    .card-icon.gray   { background: rgba(255,255,255,0.06); color: var(--muted); }
+
+    .card h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+    .card p  { font-size: 0.85rem; color: var(--muted); line-height: 1.6; margin: 0; }
+
+    /* Pipeline */
+    .pipeline {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      margin-top: 20px;
+    }
+    .step {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      position: relative;
+    }
+    .step + .step { margin-top: 24px; }
+    .step + .step::before {
+      content: '';
+      position: absolute;
+      left: 15px;
+      top: -24px;
+      height: 24px;
+      width: 2px;
+      background: linear-gradient(to bottom, rgba(124,92,252,0.4), rgba(124,92,252,0.1));
+    }
+    .step-num {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), #4a2fcf);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.78rem; font-weight: 700;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(124,92,252,0.3);
+    }
+    .step-body h4 { font-size: 0.92rem; font-weight: 600; margin-bottom: 4px; }
+    .step-body p  { font-size: 0.83rem; color: var(--muted); line-height: 1.5; margin: 0; }
+
+    /* Badge */
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+    .badge.primary { background: rgba(124,92,252,0.2); color: var(--accent); }
+    .badge.fallback { background: rgba(255,255,255,0.07); color: var(--muted); }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      font-size: 0.87rem;
+    }
+    th {
+      text-align: left;
+      padding: 10px 14px;
+      color: var(--muted);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(108,82,255,0.08);
+      color: var(--muted);
+    }
+    td:first-child { color: var(--text); font-weight: 500; }
+    tr:last-child td { border-bottom: none; }
+
+    /* Code */
+    code {
+      background: rgba(124,92,252,0.12);
+      color: var(--accent2);
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-size: 0.83em;
+      font-family: 'Consolas', monospace;
+    }
+
+    /* Divider */
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 52px 0;
+    }
+
+    /* Tip box */
+    .tip {
+      background: rgba(0,229,160,0.06);
+      border: 1px solid rgba(0,229,160,0.2);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      font-size: 0.87rem;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-top: 20px;
+    }
+    .tip strong { color: var(--ok); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <!-- Nav -->
+    <nav class="nav">
+      <img src="/logo.svg" alt="scryb"/>
+      <a class="back-link" href="/">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        Back to app
+      </a>
+    </nav>
+
+    <!-- Hero -->
+    <h1 class="page-title">How <span>scryb</span> works</h1>
+    <p class="page-lead">scryb turns audio and video recordings into clean, readable text using a combination of local AI models and Groq's cloud transcription API — all running from your machine.</p>
+
+    <!-- What is it -->
+    <section class="section">
+      <p class="section-title">Overview</p>
+      <div class="cards">
+        <div class="card">
+          <div class="card-icon purple">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+          <h3>Groq Whisper (primary)</h3>
+          <p>Whisper Large v3 Turbo runs on Groq's cloud. Transcribes a 1-hour meeting in ~10 seconds with near-perfect accuracy.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon gray">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          </div>
+          <h3>whisper.cpp (fallback)</h3>
+          <p>Local model runs on your CPU — no internet needed. Used when Groq is unavailable or the file exceeds 24 MB.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon cyan">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          </div>
+          <h3>Llama 3.1 refinement</h3>
+          <p>After local transcription, Llama 3.1 fixes grammar, removes artifacts and improves readability. Skipped for Groq Whisper.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon green">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <h3>100% private</h3>
+          <p>Files are processed locally and deleted right after transcription. Your audio never leaves your machine except to Groq's API.</p>
+        </div>
+      </div>
+    </section>
+
+    <hr/>
+
+    <!-- Pipeline -->
+    <section class="section">
+      <p class="section-title">Transcription pipeline</p>
+      <h2>What happens when you click Transcribe</h2>
+      <div class="pipeline">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <h4>Upload &amp; validate</h4>
+            <p>Files are received by the Express server via multipart form upload. Unsupported formats are rejected immediately.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <h4>Convert to WAV</h4>
+            <p>FFmpeg converts every file to 16 kHz mono PCM WAV — the format whisper models expect. Saved to <code>%TEMP%\whisper-transcricao\</code>.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <h4>Groq Whisper Large <span class="badge primary">primary</span></h4>
+            <p>The WAV is re-encoded to OGG (smaller) and sent to Groq's API with your language and context prompt. Returns the transcript in seconds.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <h4>whisper.cpp local <span class="badge fallback">fallback</span></h4>
+            <p>If Groq is unavailable or the file is &gt;24 MB, <code>whisper-cli.exe</code> runs locally with anti-hallucination flags (<code>-et 2.8 -lpt -0.5</code>).</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">5</div>
+          <div class="step-body">
+            <h4>Clean &amp; refine</h4>
+            <p>Noise markers, subtitle hallucinations and filler word loops are removed. For local transcriptions, Llama 3.1 does a final grammar pass.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">6</div>
+          <div class="step-body">
+            <h4>Result delivered</h4>
+            <p>The transcript appears in the UI. Temp files are deleted. The completed job is saved to <code>storage/jobs.json</code> for recovery on restart.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <hr/>
+
+    <!-- Job queue -->
+    <section class="section">
+      <p class="section-title">Reliability</p>
+      <h2>Job queue &amp; persistence</h2>
+      <p>Each transcription request is a <strong>job</strong> tracked in memory and on disk. The UI polls for updates every 1.2 seconds.</p>
+      <p>If you close the browser tab or reload while transcription is running, the job keeps processing in the background. When you reopen the page, it automatically reconnects and shows the result.</p>
+      <p>On server restart, all completed jobs are restored from <code>storage/jobs.json</code> (up to 100 jobs).</p>
+    </section>
+
+    <hr/>
+
+    <!-- Craig -->
+    <section class="section">
+      <p class="section-title">Craig bot integration</p>
+      <h2>Transcribing Discord calls</h2>
+      <p><strong>Craig</strong> is a Discord bot that records multi-track audio from voice channels — one <code>.flac</code> file per participant.</p>
+      <p>Use the <strong>Craig folder</strong> drop zone to select the entire Craig export folder. scryb transcribes each track separately and labels the output by filename, so you can tell who said what.</p>
+
+      <div class="tip">
+        <strong>Tip:</strong> Fill in the <em>Context</em> field with the names of participants and any technical terms used in the call. This is passed to Whisper as a prompt hint and significantly improves recognition of names and jargon.
+      </div>
+    </section>
+
+    <hr/>
+
+    <!-- Models -->
+    <section class="section">
+      <p class="section-title">Local models</p>
+      <h2>whisper.cpp models</h2>
+      <p>Models are stored in <code>vendor/whispercpp/models/</code>. Only Groq Whisper needs an internet connection.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Size</th>
+            <th>Speed</th>
+            <th>Quality</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>ggml-tiny.bin</td><td>75 MB</td><td>Fastest</td><td>Basic</td></tr>
+          <tr><td>ggml-base.bin</td><td>142 MB</td><td>Fast</td><td>Good</td></tr>
+          <tr><td>ggml-small.bin</td><td>466 MB</td><td>Medium</td><td>Better</td></tr>
+          <tr><td>ggml-medium.bin</td><td>1.5 GB</td><td>Slow</td><td>High</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr/>
+
+    <!-- API Key -->
+    <section class="section">
+      <p class="section-title">Setup</p>
+      <h2>Groq API key</h2>
+      <p>Groq offers a generous free tier: <strong>7,200 minutes per day</strong> (120 hours). For personal use, this is effectively unlimited.</p>
+      <p>Get a free key at <a href="https://console.groq.com/keys" target="_blank" style="color:var(--accent2)">console.groq.com/keys</a>, then paste it in the ⚙️ Settings panel. The key is stored locally in your user profile — never shared with anyone.</p>
+
+      <div class="tip">
+        <strong>Without a Groq key:</strong> scryb falls back to the local whisper.cpp model. Transcription still works, but is slower and less accurate.
+      </div>
+    </section>
+
+  </div>
+</body>
+</html>
