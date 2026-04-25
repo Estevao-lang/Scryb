@@ -461,6 +461,16 @@ const upload = multer({
   }
 });
 
+// ── Auth middleware (lazy — initialized in startup, applied here) ──
+// These refs are filled during startup before any request arrives
+const sessionMiddleware = (req, res, next) => (app.locals._session || ((r,s,n)=>n()))(req, res, next);
+const passportInit      = (req, res, next) => (app.locals._passportInit || ((r,s,n)=>n()))(req, res, next);
+const passportSession   = (req, res, next) => (app.locals._passportSession || ((r,s,n)=>n()))(req, res, next);
+
+app.use(sessionMiddleware);
+app.use(passportInit);
+app.use(passportSession);
+
 // ── Routes ────────────────────────────────────────────────────
 
 const publicDir = path.resolve(__dirname, "public");
@@ -696,24 +706,23 @@ ensureStorage()
   .then(async () => {
     await loadSettings();
 
-    // Auth + DB setup (gracefully skipped if DATABASE_URL not set)
+    // Auth + DB — session/passport MUST be registered before routes are hit
     const dbAvailable = await auth.checkDb();
     app.locals.dbAvailable = dbAvailable;
+
+    // Always configure passport strategy (needed for OAuth routes)
+    auth.configurePassport();
+    // Store middlewares in app.locals — picked up by lazy wrappers registered before routes
+    app.locals._session         = auth.buildSessionMiddleware(dbAvailable);
+    app.locals._passportInit    = passport.initialize();
+    app.locals._passportSession = passport.session();
+
     if (dbAvailable) {
-      auth.configurePassport();
-      app.use(auth.buildSessionMiddleware(true));
-      app.use(passport.initialize());
-      app.use(passport.session());
-      // Clean expired transcriptions every hour
       setInterval(auth.deleteExpired, 60 * 60 * 1000);
       auth.deleteExpired();
       console.log("[db] connected — auth enabled");
     } else {
-      // Still need session + passport stubs so routes don't crash
-      app.use(auth.buildSessionMiddleware(false));
-      app.use(passport.initialize());
-      app.use(passport.session());
-      console.log("[db] no DATABASE_URL — running without auth");
+      console.log("[db] no DATABASE_URL — running without persistent sessions");
     }
 
     // whisper-cli is optional — Groq Whisper is the primary engine

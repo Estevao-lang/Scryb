@@ -91,7 +91,11 @@ const deleteExpired = async () => {
 
 // ── Passport ──────────────────────────────────────────────────
 const configurePassport = () => {
-  // Desktop Electron uses a custom loopback redirect
+  if (!process.env.DISCORD_CLIENT_ID || !process.env.DISCORD_CLIENT_SECRET) {
+    console.warn("[auth] DISCORD_CLIENT_ID/SECRET not set — OAuth login disabled");
+    return;
+  }
+
   const isDesktop  = process.env.ELECTRON_APP === "1";
   const callbackURL = isDesktop
     ? `http://localhost:${process.env.PORT || 3000}/auth/discord/callback`
