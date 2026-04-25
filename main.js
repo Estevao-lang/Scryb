@@ -48,24 +48,27 @@ const startServer = () =>
       }
     });
 
-    // Poll until the server responds
-    const check = setInterval(async () => {
-      try {
-        const res = await fetch(BASE_URL);
-        if (res.ok || res.status < 500) {
-          clearInterval(check);
-          resolve();
-        }
-      } catch {
-        // still starting — keep waiting
-      }
-    }, 300);
-
-    // Timeout after 30 s
+    // Wait 2s before polling — gives Node time to load modules from disk on first launch
     setTimeout(() => {
-      clearInterval(check);
-      reject(new Error("Server did not start in time."));
-    }, 30_000);
+      // Poll until the server responds
+      const check = setInterval(async () => {
+        try {
+          const res = await fetch(BASE_URL);
+          if (res.ok || res.status < 500) {
+            clearInterval(check);
+            resolve();
+          }
+        } catch {
+          // still starting — keep waiting
+        }
+      }, 300);
+
+      // Timeout after 60 s — first launch can be slow (opusscript init, disk warm-up)
+      setTimeout(() => {
+        clearInterval(check);
+        reject(new Error("Server did not start in time."));
+      }, 58_000);
+    }, 2000);
   });
 
 // ── Create the main window ────────────────────────────────────
