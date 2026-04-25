@@ -2,17 +2,17 @@
   "name": "scryb",
   "version": "1.0.0",
   "description": "Fast, free and private audio transcription powered by Whisper and Groq AI",
+  "author": "Estevão Gabriel",
   "main": "main.js",
   "scripts": {
     "start": "node server.js",
     "electron": "electron .",
-    "postinstall": "echo ok",
-    "build": "electron-builder --win --x64",
+    "postinstall": "electron-builder install-app-deps",
+    "build": "node scripts/generate-ico.js && electron-builder --win --x64",
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux"
   },
   "dependencies": {
-    "@discordjs/opus": "^0.10.0",
     "@discordjs/voice": "^0.19.2",
     "discord.js": "^14.26.3",
     "dotenv": "^17.3.1",
@@ -37,9 +37,9 @@
     "files": [
       "main.js",
       "server.js",
+      "recorder.js",
       "loading.html",
       "error.html",
-      ".env",
       "public/**/*",
       "package.json",
       "node_modules/**/*",
@@ -71,22 +71,23 @@
           ]
         }
       ],
-      "icon": "public/icon.png"
+      "icon": "public/icon.ico"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "installerIcon": "public/icon.png",
+      "installerIcon": "public/icon.ico",
+      "uninstallerIcon": "public/icon.ico",
       "shortcutName": "scryb"
     },
     "mac": {
       "target": "dmg",
-      "icon": "public/icon.png",
+      "icon": "public/icon.ico",
       "category": "public.app-category.productivity"
     },
     "linux": {
       "target": "AppImage",
-      "icon": "public/icon.png",
+      "icon": "public/icon.ico",
       "category": "AudioVideo"
     }
   }

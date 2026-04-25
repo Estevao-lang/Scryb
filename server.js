@@ -449,10 +449,13 @@ app.use(express.static("public"));
 app.get("/api/settings", (req, res) => {
   const key = process.env.GROQ_API_KEY || "";
   const token = process.env.DISCORD_BOT_TOKEN || "";
+  // RENDER env var is set automatically on Render.com
+  const isCloud = !!(process.env.RENDER || process.env.RAILWAY_ENVIRONMENT);
   res.json({
     hasGroqKey: key.length > 0,
     maskedKey: key.length > 8 ? `${key.slice(0, 8)}...` : null,
-    hasDiscordToken: token.length > 0
+    hasDiscordToken: token.length > 0,
+    recorderAvailable: !isCloud
   });
 });
 

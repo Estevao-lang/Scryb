@@ -424,15 +424,20 @@ document.getElementById("ob-discord-skip").addEventListener("click", finishOnboa
 fetch("/api/settings")
   .then((r) => r.json())
   .then((s) => {
+    // Hide Record tab on cloud deployments (no recorder process)
+    if (s.recorderAvailable === false) {
+      document.querySelector('[data-tab="record"]').hidden = true;
+    }
+
     const onboarded = localStorage.getItem("scryb_onboarded");
     if (!onboarded && !s.hasGroqKey) {
-      // First run — show onboarding
       onboardingOverlay.hidden = false;
       showObStep(0);
     } else {
-      // Already set up
       if (!s.hasGroqKey) setupBanner.hidden = false;
-      if (!s.hasDiscordToken) document.getElementById("recorder-no-token").hidden = false;
+      if (!s.hasDiscordToken && s.recorderAvailable !== false) {
+        document.getElementById("recorder-no-token").hidden = false;
+      }
     }
   })
   .catch(() => {});
