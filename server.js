@@ -9,18 +9,20 @@ try {
 } catch {}
 
 require("dotenv").config({ path: require("path").join(__dirname, ".env") });
-const express = require("express");
-const multer = require("multer");
+const express  = require("express");
+const passport = require("passport");
+const multer   = require("multer");
 const ffmpegPath = require("ffmpeg-static");
-const path = require("path");
-const os = require("os");
-const fs = require("fs/promises");
-const crypto = require("crypto");
+const path     = require("path");
+const os       = require("os");
+const fs       = require("fs/promises");
+const crypto   = require("crypto");
 const { spawn } = require("child_process");
+const auth     = require("./auth");
 
-const app = express();
-app.use(express.json());
+const app  = express();
 const port = process.env.PORT || 3000;
+app.use(express.json());
 
 // In Electron, USER_DATA_PATH is set to app.getPath("userData") — writable by the user.
 // Fall back to a local "storage" folder when running standalone (dev / Render).
@@ -196,9 +198,17 @@ const refineWithGroq = async (text, language) => {
   const languageNames = { portuguese: "português", english: "English", spanish: "español" };
   const langName = languageNames[language] || "português";
 
-  const prompt = `You have received an automatic audio transcription in ${langName} produced by Whisper. It may contain recognition errors, invented words, incomplete sentences and repetitions. Fix obvious errors, remove unnecessary repetitions and improve fluency, but preserve the original content and speaking style. Do not add information that was not in the text. Return only the corrected text, without explanations.
+  const prompt = `You are an expert transcription editor. You received an automatic audio transcription in ${langName} produced by Whisper AI. Your task is to produce a clean, professional version suitable for reports and documentation.
 
-Transcription:
+Rules:
+- Fix speech recognition errors (wrong words, homophones, invented words)
+- Remove filler words (uh, um, like, you know, né, então, tipo) and false starts
+- Fix punctuation, capitalization and paragraph breaks
+- Preserve technical terms, proper names and numbers exactly as spoken
+- Keep the original speaker's meaning — do not add, remove or change facts
+- Output ONLY the corrected text, no explanations, no headers
+
+Transcription to fix:
 ${text}`;
 
   try {
@@ -209,9 +219,9 @@ ${text}`;
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
+        model: "llama-3.3-70b-versatile",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.3,
+        temperature: 0.2,
         max_tokens: 4096
       })
     });
@@ -334,10 +344,8 @@ const processJob = async (job, uploadedFiles, relativePaths, language, includeTi
       }
 
       const cleanedText = cleanTranscription(rawText);
-      // Groq Whisper is already accurate — skip LLM refinement to save quota
-      const resultText = usedGroqWhisper
-        ? cleanedText
-        : await refineWithGroq(cleanedText, language);
+      // Always refine with LLM for report-quality output
+      const resultText = await refineWithGroq(cleanedText, language);
 
       job.results.push({
         fileName: file.originalname,
@@ -455,12 +463,60 @@ const upload = multer({
 
 // ── Routes ────────────────────────────────────────────────────
 
+const publicDir = path.resolve(__dirname, "public");
+
+// Landing page — always public
+app.get("/", (req, res) => res.sendFile(path.join(publicDir, "home.html")));
+
+// App — open if no DB, protected by session if DB available
+app.get("/app", (req, res, next) => {
+  if (!app.locals.dbAvailable) return res.sendFile(path.join(publicDir, "index.html"));
+  auth.requireAuth(req, res, () => res.sendFile(path.join(publicDir, "index.html")));
+});
+
 app.use(express.static("public", { etag: false, maxAge: 0 }));
 
-// Landing page at root, app at /app
-const publicDir = path.resolve(__dirname, "public");
-app.get("/", (req, res) => res.sendFile(path.join(publicDir, "home.html")));
-app.get("/app", (req, res) => res.sendFile(path.join(publicDir, "index.html")));
+// ── Auth routes ───────────────────────────────────────────────
+
+app.get("/auth/discord",
+  passport.authenticate("discord", { scope: ["identify", "guilds"] })
+);
+
+app.get("/auth/discord/callback",
+  passport.authenticate("discord", { failureRedirect: "/?login=failed" }),
+  (req, res) => res.redirect("/app")
+);
+
+app.get("/auth/logout", (req, res, next) => {
+  req.logout((err) => {
+    if (err) return next(err);
+    res.redirect("/");
+  });
+});
+
+app.get("/auth/me", (req, res) => {
+  if (!req.isAuthenticated()) return res.json({ authenticated: false });
+  const { id, discord_id, username, avatar, discriminator } = req.user;
+  res.json({
+    authenticated: true,
+    user: {
+      id, discord_id, username, discriminator,
+      avatarUrl: avatar
+        ? `https://cdn.discordapp.com/avatars/${discord_id}/${avatar}.png?size=64`
+        : `https://cdn.discordapp.com/embed/avatars/${parseInt(discriminator || 0) % 5}.png`
+    }
+  });
+});
+
+// Transcription history (encrypted, only for authenticated users)
+app.get("/api/transcriptions", auth.requireAuth, async (req, res) => {
+  try {
+    const list = await auth.getUserTranscriptions(req.user.id);
+    res.json(list);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load transcriptions" });
+  }
+});
 
 app.get("/api/settings", (req, res) => {
   const key = process.env.GROQ_API_KEY || "";
@@ -639,14 +695,47 @@ app.use((error, req, res, next) => {
 ensureStorage()
   .then(async () => {
     await loadSettings();
+
+    // Auth + DB setup (gracefully skipped if DATABASE_URL not set)
+    const dbAvailable = await auth.checkDb();
+    app.locals.dbAvailable = dbAvailable;
+    if (dbAvailable) {
+      auth.configurePassport();
+      app.use(auth.buildSessionMiddleware(true));
+      app.use(passport.initialize());
+      app.use(passport.session());
+      // Clean expired transcriptions every hour
+      setInterval(auth.deleteExpired, 60 * 60 * 1000);
+      auth.deleteExpired();
+      console.log("[db] connected — auth enabled");
+    } else {
+      // Still need session + passport stubs so routes don't crash
+      app.use(auth.buildSessionMiddleware(false));
+      app.use(passport.initialize());
+      app.use(passport.session());
+      console.log("[db] no DATABASE_URL — running without auth");
+    }
+
     // whisper-cli is optional — Groq Whisper is the primary engine
     const whisperAvailable = await fs.access(whisperCliPath).then(() => true).catch(() => false);
     if (!whisperAvailable) {
       console.warn("[whisper] whisper-cli.exe not found — using Groq Whisper only.");
     }
     await loadJobs();
-    app.listen(port, () => {
+    const server = app.listen(port, () => {
       console.log(`Server running at http://localhost:${port}`);
+    });
+    server.on("error", (err) => {
+      if (err.code === "EADDRINUSE") {
+        console.error(`[server] Port ${port} in use, retrying on ${port + 1}`);
+        server.close();
+        app.listen(port + 1, () => {
+          console.log(`Server running at http://localhost:${port + 1}`);
+        });
+      } else {
+        console.error("[server] Fatal:", err);
+        process.exit(1);
+      }
     });
   })
   .catch((error) => {

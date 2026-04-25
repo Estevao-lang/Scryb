@@ -24,6 +24,43 @@
     .land-nav-logo { display: flex; align-items: center; gap: 10px; }
     .land-nav-logo img { height: 28px; }
     .land-nav-links { display: flex; align-items: center; gap: 12px; }
+
+    /* ── User avatar pill ── */
+    .nav-user {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(124,92,252,0.12);
+      border: 1px solid rgba(124,92,252,0.25);
+      border-radius: 999px;
+      padding: 4px 14px 4px 4px;
+      font-size: 0.82rem; font-weight: 600;
+    }
+    .nav-user img {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+    .nav-logout {
+      background: none; border: none;
+      color: var(--muted); font-size: 0.78rem;
+      cursor: pointer; padding: 0 0 0 6px;
+      transition: color .2s;
+    }
+    .nav-logout:hover { color: var(--error); }
+
+    /* ── Discord login button ── */
+    .btn-discord {
+      display: inline-flex; align-items: center; gap: 9px;
+      background: #5865F2;
+      color: #fff;
+      font-size: 1rem; font-weight: 700;
+      text-decoration: none;
+      padding: 14px 32px;
+      border-radius: 999px;
+      box-shadow: 0 8px 32px rgba(88,101,242,0.4);
+      transition: transform .2s, box-shadow .2s;
+    }
+    .btn-discord:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(88,101,242,0.55); }
+    .btn-discord svg { flex-shrink: 0; }
     .land-nav-link {
       color: var(--muted);
       font-size: 0.85rem;
@@ -352,7 +389,10 @@
     <div class="land-nav-links">
       <a href="#how-it-works" class="land-nav-link">How it works</a>
       <a href="#get-started" class="land-nav-link">Get started</a>
-      <a href="/app" class="land-nav-cta">Open app →</a>
+      <!-- Filled by JS based on /auth/me -->
+      <div id="nav-auth-area">
+        <a href="/app" class="land-nav-cta">Open app →</a>
+      </div>
     </div>
   </nav>
 
@@ -364,10 +404,11 @@
     </div>
     <h1 class="land-h1">Your call.<br>In text. <span>Now.</span></h1>
     <p class="land-sub">Upload audio files or record Discord calls directly. Get accurate transcriptions in seconds — powered by Groq Whisper.</p>
-    <div class="land-cta-row">
-      <a href="/app" class="land-btn-primary">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        Start transcribing
+    <div class="land-cta-row" id="hero-cta">
+      <!-- Filled by JS -->
+      <a href="/auth/discord" class="btn-discord">
+        <svg width="20" height="20" viewBox="0 0 127.14 96.36" fill="currentColor"><path d="M107.7 8.07A105.2 105.2 0 0 0 81.47 0a72 72 0 0 0-3.36 6.83 97.68 97.68 0 0 0-29.11 0A72.37 72.37 0 0 0 45.64 0a105.89 105.89 0 0 0-26.25 8.09C2.79 32.65-1.71 56.6.54 80.21a105.73 105.73 0 0 0 32.17 16.15 77.7 77.7 0 0 0 6.89-11.11 68.42 68.42 0 0 1-10.85-5.18c.91-.66 1.8-1.34 2.66-2a75.57 75.57 0 0 0 64.32 0c.87.71 1.76 1.39 2.66 2a68.68 68.68 0 0 1-10.87 5.19 77 77 0 0 0 6.89 11.1 105.25 105.25 0 0 0 32.19-16.14c2.64-27.38-4.51-51.11-18.9-72.15zM42.45 65.69C36.18 65.69 31 60 31 53s5-12.74 11.43-12.74S54 46 53.89 53s-5.05 12.69-11.44 12.69zm42.24 0C78.41 65.69 73.25 60 73.25 53s5-12.74 11.44-12.74S96.23 46 96.12 53s-5.04 12.69-11.43 12.69z"/></svg>
+        Login with Discord
       </a>
       <a href="#get-started" class="land-btn-secondary">
         Get your free API key
@@ -521,8 +562,9 @@
   <div class="land-cta-bottom">
     <h2>Ready to transcribe?</h2>
     <p>Free, private, and takes 2 minutes to set up.</p>
-    <a href="/app" class="land-btn-primary" style="font-size:1.05rem;padding:16px 40px">
-      Start for free →
+    <a href="/auth/discord" class="btn-discord" style="font-size:1.05rem;padding:16px 40px" id="bottom-cta-btn">
+      <svg width="20" height="20" viewBox="0 0 127.14 96.36" fill="currentColor"><path d="M107.7 8.07A105.2 105.2 0 0 0 81.47 0a72 72 0 0 0-3.36 6.83 97.68 97.68 0 0 0-29.11 0A72.37 72.37 0 0 0 45.64 0a105.89 105.89 0 0 0-26.26 8.09C2.79 32.65-1.71 56.6.54 80.21a105.73 105.73 0 0 0 32.17 16.15 77.7 77.7 0 0 0 6.89-11.11 68.42 68.42 0 0 1-10.85-5.18c.91-.66 1.8-1.34 2.66-2a75.57 75.57 0 0 0 64.32 0c.87.71 1.76 1.39 2.66 2a68.68 68.68 0 0 1-10.87 5.19 77 77 0 0 0 6.89 11.1 105.25 105.25 0 0 0 32.19-16.14c2.64-27.38-4.51-51.11-18.9-72.15zM42.45 65.69C36.18 65.69 31 60 31 53s5-12.74 11.43-12.74S54 46 53.89 53s-5.05 12.69-11.44 12.69zm42.24 0C78.41 65.69 73.25 60 73.25 53s5-12.74 11.44-12.74S96.23 46 96.12 53s-5.04 12.69-11.43 12.69z"/></svg>
+      Login with Discord — it's free
     </a>
   </div>
 
@@ -530,6 +572,45 @@
   <footer class="land-footer">
     <p>© 2025 scryb · Built by Estevão Gabriel · <a href="/app">Open app</a></p>
   </footer>
+
+  <script>
+    // Check auth state and update UI accordingly
+    fetch("/auth/me")
+      .then(r => r.json())
+      .then(data => {
+        const navArea   = document.getElementById("nav-auth-area");
+        const heroCta   = document.getElementById("hero-cta");
+        const bottomBtn = document.getElementById("bottom-cta-btn");
+
+        if (data.authenticated) {
+          const u = data.user;
+          // Nav: show avatar + logout
+          navArea.innerHTML = `
+            <div class="nav-user">
+              <img src="${u.avatarUrl}" alt="${u.username}" onerror="this.src='/favicon.svg'"/>
+              <span>${u.username}</span>
+              <button class="nav-logout" onclick="location.href='/auth/logout'" title="Logout">✕</button>
+            </div>
+            <a href="/app" class="land-nav-cta">Open app →</a>
+          `;
+          // Hero CTA: go to app directly
+          heroCta.innerHTML = `
+            <a href="/app" class="land-btn-primary" style="font-size:1.05rem;padding:16px 36px">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Open Scryb
+            </a>
+            <a href="/auth/logout" class="land-btn-secondary">Logout</a>
+          `;
+          // Bottom CTA: same
+          bottomBtn.href = "/app";
+          bottomBtn.innerHTML = `
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Open Scryb →
+          `;
+        }
+      })
+      .catch(() => {}); // no DB / not authenticated — keep defaults
+  </script>
 
 </body>
 </html>

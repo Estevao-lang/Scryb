@@ -38,7 +38,7 @@ const startServer = () =>
   new Promise((resolve, reject) => {
     // utilityProcess.fork is the correct Electron API for running Node.js scripts
     serverProcess = utilityProcess.fork(path.join(appDir, "server.js"), [], {
-      env: { ...process.env, PORT: String(PORT), USER_DATA_PATH: app.getPath("userData") },
+      env: { ...process.env, PORT: String(PORT), USER_DATA_PATH: app.getPath("userData"), ELECTRON_APP: "1" },
       stdio: "inherit"
     });
 
@@ -95,7 +95,7 @@ const createWindow = () => {
 
   startServer()
     .then(() => {
-      mainWindow.loadURL(`${BASE_URL}/app`);
+      mainWindow.loadURL(`${BASE_URL}/`);
     })
     .catch((err) => {
       mainWindow.loadFile(path.join(__dirname, "error.html"));
