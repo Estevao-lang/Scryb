@@ -1,13 +1,26 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage, shell, utilityProcess } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const net = require("net");
 
-const PORT = process.env.PORT || 3000;
-const BASE_URL = `http://localhost:${PORT}`;
 const ICON_PATH = path.join(__dirname, "public", "icon.png");
 
 // utilityProcess.fork cannot load files from inside .asar — use the unpacked path
 const appDir = __dirname.replace("app.asar", "app.asar.unpacked");
+
+// Find a free TCP port starting from preferred
+const getFreePort = (preferred = 3000) =>
+  new Promise((resolve) => {
+    const server = net.createServer();
+    server.listen(preferred, "127.0.0.1", () => {
+      const { port } = server.address();
+      server.close(() => resolve(port));
+    });
+    server.on("error", () => resolve(getFreePort(preferred + 1)));
+  });
+
+let PORT = 3000;
+let BASE_URL = `http://localhost:${PORT}`;
 
 // Generate the icon PNG on first run if it doesn't exist yet
 if (!fs.existsSync(ICON_PATH)) {
@@ -134,22 +147,33 @@ const startRecorder = () => {
   });
 };
 
-app.whenReady().then(() => {
-  createTray();
-  createWindow();
-  startRecorder();
-});
+// Only one instance allowed — focus existing window if user opens a second
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow) { mainWindow.show(); mainWindow.focus(); }
+  });
 
-// On macOS, keep the app running even if all windows are closed
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
-});
+  app.whenReady().then(async () => {
+    PORT = await getFreePort(3000);
+    BASE_URL = `http://localhost:${PORT}`;
+    createTray();
+    createWindow();
+    startRecorder();
+  });
 
-app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow();
-});
+  app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") app.quit();
+  });
 
-app.on("before-quit", () => {
-  if (recorderProcess) { recorderProcess.kill("SIGTERM"); recorderProcess = null; }
-  if (serverProcess)   { serverProcess.kill("SIGTERM");   serverProcess = null; }
-});
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+
+  app.on("before-quit", () => {
+    if (recorderProcess) { recorderProcess.kill("SIGTERM"); recorderProcess = null; }
+    if (serverProcess)   { serverProcess.kill("SIGTERM");   serverProcess = null; }
+  });
+}
