@@ -484,7 +484,7 @@ app.get("/app", (req, res, next) => {
   auth.requireAuth(req, res, () => res.sendFile(path.join(publicDir, "index.html")));
 });
 
-app.use(express.static("public", { etag: false, maxAge: 0 }));
+app.use(express.static(publicDir, { etag: false, maxAge: 0 }));
 
 // ── Auth routes ───────────────────────────────────────────────
 

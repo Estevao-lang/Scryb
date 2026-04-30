@@ -42,10 +42,12 @@
     "files": [
       "main.js",
       "server.js",
+      "auth.js",
       "recorder.js",
       "loading.html",
       "error.html",
       "public/**/*",
+      "scripts/**/*",
       "package.json",
       "node_modules/**/*",
       "!node_modules/electron/**/*",
@@ -53,7 +55,9 @@
     ],
     "asarUnpack": [
       "server.js",
+      "auth.js",
       "recorder.js",
+      "public/**/*",
       "node_modules/**/*"
     ],
     "extraResources": [
