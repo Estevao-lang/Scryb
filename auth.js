@@ -83,6 +83,37 @@ const getUserTranscriptions = async (userId) => {
   }));
 };
 
+const saveUserSettings = async (userId, { groqApiKey }) => {
+  const encryptedGroqKey = groqApiKey ? encrypt(groqApiKey) : null;
+  const { rows } = await pool.query(
+    `INSERT INTO user_settings (user_id, encrypted_groq_api_key, updated_at)
+     VALUES ($1,$2,NOW())
+     ON CONFLICT (user_id) DO UPDATE
+       SET encrypted_groq_api_key = COALESCE($2, user_settings.encrypted_groq_api_key),
+           updated_at = NOW()
+     RETURNING user_id, encrypted_groq_api_key, created_at, updated_at`,
+    [userId, encryptedGroqKey]
+  );
+  return rows[0];
+};
+
+const getUserSettings = async (userId) => {
+  const { rows } = await pool.query(
+    `SELECT encrypted_groq_api_key, created_at, updated_at
+     FROM user_settings
+     WHERE user_id=$1`,
+    [userId]
+  );
+  const row = rows[0];
+  if (!row) return { groqApiKey: "" };
+
+  return {
+    groqApiKey: row.encrypted_groq_api_key ? decrypt(row.encrypted_groq_api_key) : "",
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  };
+};
+
 const deleteExpired = async () => {
   const { rows } = await pool.query("SELECT delete_expired_transcriptions()");
   const n = rows[0]?.delete_expired_transcriptions || 0;
@@ -181,6 +212,8 @@ module.exports = {
   upsertUser,
   saveTranscription,
   getUserTranscriptions,
+  saveUserSettings,
+  getUserSettings,
   deleteExpired,
   configurePassport,
   buildSessionMiddleware,

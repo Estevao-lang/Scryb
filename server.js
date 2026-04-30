@@ -191,8 +191,7 @@ const cleanTranscription = (text) => {
   return cleaned.filter((line, i) => i === 0 || line !== cleaned[i - 1]).join("\n");
 };
 
-const refineWithGroq = async (text, language) => {
-  const apiKey = process.env.GROQ_API_KEY;
+const refineWithGroq = async (text, language, apiKey = process.env.GROQ_API_KEY) => {
   if (!apiKey || !text.trim()) return text;
 
   const languageNames = { portuguese: "português", english: "English", spanish: "español" };
@@ -261,8 +260,7 @@ const convertToOgg = (inputPath, outputPath) =>
     });
   });
 
-const transcribeWithGroqWhisper = async (inputPath, language, context) => {
-  const apiKey = process.env.GROQ_API_KEY;
+const transcribeWithGroqWhisper = async (inputPath, language, context, apiKey = process.env.GROQ_API_KEY) => {
   if (!apiKey) return null;
 
   // Convert to small OGG to stay under Groq's 25 MB limit
@@ -321,7 +319,7 @@ const transcribeWithGroqWhisper = async (inputPath, language, context) => {
 
 // ── Job processing ────────────────────────────────────────────
 
-const processJob = async (job, uploadedFiles, relativePaths, language, includeTimestamps, modelFile, speedMode, context) => {
+const processJob = async (job, uploadedFiles, relativePaths, language, includeTimestamps, modelFile, speedMode, context, groqApiKey) => {
   const convertedPaths = [];
 
   try {
@@ -335,7 +333,7 @@ const processJob = async (job, uploadedFiles, relativePaths, language, includeTi
       await convertToWav(file.path, wavPath);
 
       // Try Groq Whisper Large first; fall back to local whisper.cpp
-      let rawText = await transcribeWithGroqWhisper(wavPath, language, context);
+      let rawText = await transcribeWithGroqWhisper(wavPath, language, context, groqApiKey);
       let usedGroqWhisper = rawText !== null;
 
       if (!usedGroqWhisper) {
@@ -345,7 +343,7 @@ const processJob = async (job, uploadedFiles, relativePaths, language, includeTi
 
       const cleanedText = cleanTranscription(rawText);
       // Always refine with LLM for report-quality output
-      const resultText = await refineWithGroq(cleanedText, language);
+      const resultText = await refineWithGroq(cleanedText, language, groqApiKey);
 
       job.results.push({
         fileName: file.originalname,
@@ -466,6 +464,11 @@ const upload = multer({
 const sessionMiddleware = (req, res, next) => (app.locals._session || ((r,s,n)=>n()))(req, res, next);
 const passportInit      = (req, res, next) => (app.locals._passportInit || ((r,s,n)=>n()))(req, res, next);
 const passportSession   = (req, res, next) => (app.locals._passportSession || ((r,s,n)=>n()))(req, res, next);
+const requireDiscordOAuth = (req, res, next) => {
+  if (app.locals.discordOAuthAvailable) return next();
+
+  return res.redirect(app.locals.dbAvailable ? "/?login=disabled" : "/app");
+};
 
 app.use(sessionMiddleware);
 app.use(passportInit);
@@ -489,12 +492,30 @@ app.use(express.static(publicDir, { etag: false, maxAge: 0 }));
 // ── Auth routes ───────────────────────────────────────────────
 
 app.get("/auth/discord",
+  requireDiscordOAuth,
   passport.authenticate("discord", { scope: ["identify", "guilds"] })
 );
 
 app.get("/auth/discord/callback",
-  passport.authenticate("discord", { failureRedirect: "/?login=failed" }),
-  (req, res) => res.redirect("/app")
+  requireDiscordOAuth,
+  (req, res, next) => {
+    passport.authenticate("discord", (err, user) => {
+      if (err) {
+        console.error("[auth] Discord callback failed:", err.message);
+        return res.redirect(`/?login=failed&reason=${encodeURIComponent(err.message)}`);
+      }
+
+      if (!user) return res.redirect("/?login=failed");
+
+      req.logIn(user, (loginErr) => {
+        if (loginErr) {
+          console.error("[auth] Discord login failed:", loginErr.message);
+          return next(loginErr);
+        }
+        return res.redirect("/app");
+      });
+    })(req, res, next);
+  }
 );
 
 app.get("/auth/logout", (req, res, next) => {
@@ -505,10 +526,19 @@ app.get("/auth/logout", (req, res, next) => {
 });
 
 app.get("/auth/me", (req, res) => {
-  if (!req.isAuthenticated()) return res.json({ authenticated: false });
+  const authInfo = {
+    discordOAuthAvailable: Boolean(app.locals.discordOAuthAvailable),
+    authRequired: Boolean(app.locals.dbAvailable)
+  };
+
+  if (!req.isAuthenticated()) {
+    return res.json({ authenticated: false, ...authInfo });
+  }
+
   const { id, discord_id, username, avatar, discriminator } = req.user;
   res.json({
     authenticated: true,
+    ...authInfo,
     user: {
       id, discord_id, username, discriminator,
       avatarUrl: avatar
@@ -529,6 +559,26 @@ app.get("/api/transcriptions", auth.requireAuth, async (req, res) => {
 });
 
 app.get("/api/settings", (req, res) => {
+  if (app.locals.dbAvailable && !req.isAuthenticated()) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (app.locals.dbAvailable) {
+    return auth.getUserSettings(req.user.id)
+      .then((settings) => {
+        const key = settings.groqApiKey || "";
+        const token = process.env.DISCORD_BOT_TOKEN || "";
+        const isCloud = !!(process.env.RENDER || process.env.RAILWAY_ENVIRONMENT);
+        res.json({
+          hasGroqKey: key.length > 0,
+          maskedKey: key.length > 8 ? `${key.slice(0, 8)}...` : null,
+          hasDiscordToken: token.length > 0,
+          recorderAvailable: !isCloud
+        });
+      })
+      .catch(() => res.status(500).json({ error: "Failed to load settings." }));
+  }
+
   const key = process.env.GROQ_API_KEY || "";
   const token = process.env.DISCORD_BOT_TOKEN || "";
   // RENDER env var is set automatically on Render.com
@@ -543,6 +593,25 @@ app.get("/api/settings", (req, res) => {
 
 app.post("/api/settings", async (req, res) => {
   const { groqApiKey, discordBotToken } = req.body || {};
+
+  if (app.locals.dbAvailable && !req.isAuthenticated()) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (app.locals.dbAvailable) {
+    if (typeof groqApiKey !== "string" || !groqApiKey.trim()) {
+      return res.status(400).json({ error: "Groq API key is required." });
+    }
+
+    try {
+      await auth.saveUserSettings(req.user.id, { groqApiKey: groqApiKey.trim() });
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error("[settings] user save failed:", err.message);
+      return res.status(500).json({ error: "Failed to save settings." });
+    }
+  }
+
   const current = await fs.readFile(settingsFile, "utf8").then(JSON.parse).catch(() => ({}));
   const updated = { ...current };
 
@@ -585,6 +654,10 @@ app.get("/api/recorder/status", async (req, res) => {
 });
 
 app.post("/api/recorder/start", async (req, res) => {
+  if (app.locals.dbAvailable && !req.isAuthenticated()) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   const token = process.env.DISCORD_BOT_TOKEN;
   if (!token) return res.status(400).json({ error: "Discord bot token not configured." });
 
@@ -600,6 +673,10 @@ app.post("/api/recorder/start", async (req, res) => {
 });
 
 app.post("/api/recorder/stop", async (req, res) => {
+  if (app.locals.dbAvailable && !req.isAuthenticated()) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   const { language = "portuguese", context = "" } = req.body || {};
 
   try {
@@ -630,7 +707,11 @@ app.post("/api/recorder/stop", async (req, res) => {
     };
 
     jobs.set(job.id, job);
-    void processJob(job, uploadedFiles, relativePaths, language, false, "ggml-tiny.bin", false, context);
+    const userSettings = app.locals.dbAvailable
+      ? await auth.getUserSettings(req.user.id)
+      : { groqApiKey: process.env.GROQ_API_KEY || "" };
+
+    void processJob(job, uploadedFiles, relativePaths, language, false, "ggml-tiny.bin", false, context, userSettings.groqApiKey);
 
     return res.status(202).json({ jobId: job.id, ...serializeJob(job), channelName: data.channelName });
   } catch (err) {
@@ -647,6 +728,10 @@ app.get("/api/modelos", async (req, res) => {
 });
 
 app.post("/api/transcrever", upload.array("media", 20), async (req, res) => {
+  if (app.locals.dbAvailable && !req.isAuthenticated()) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
   const uploadedFiles = req.files || [];
 
   if (!uploadedFiles.length) {
@@ -663,6 +748,9 @@ app.post("/api/transcrever", upload.array("media", 20), async (req, res) => {
   const modelFile = modelExists ? requestedModel : "ggml-tiny.bin";
   const speedMode = req.body.speed === "fast";
   const context = typeof req.body.context === "string" ? req.body.context.slice(0, 500).trim() : "";
+  const userSettings = app.locals.dbAvailable
+    ? await auth.getUserSettings(req.user.id)
+    : { groqApiKey: process.env.GROQ_API_KEY || "" };
 
   const job = {
     id: crypto.randomUUID(),
@@ -678,7 +766,7 @@ app.post("/api/transcrever", upload.array("media", 20), async (req, res) => {
   };
 
   jobs.set(job.id, job);
-  void processJob(job, uploadedFiles, relativePaths, language, includeTimestamps, modelFile, speedMode, context);
+  void processJob(job, uploadedFiles, relativePaths, language, includeTimestamps, modelFile, speedMode, context, userSettings.groqApiKey);
 
   return res.status(202).json({ jobId: job.id, ...serializeJob(job) });
 });
@@ -712,6 +800,7 @@ ensureStorage()
 
     // Always configure passport strategy (needed for OAuth routes)
     auth.configurePassport();
+    app.locals.discordOAuthAvailable = Boolean(dbAvailable && process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET);
     // Store middlewares in app.locals — picked up by lazy wrappers registered before routes
     app.locals._session         = auth.buildSessionMiddleware(dbAvailable);
     app.locals._passportInit    = passport.initialize();

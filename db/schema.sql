@@ -31,6 +31,14 @@ CREATE TABLE IF NOT EXISTS transcriptions (
 CREATE INDEX IF NOT EXISTS transcriptions_user_idx  ON transcriptions (user_id);
 CREATE INDEX IF NOT EXISTS transcriptions_expire_idx ON transcriptions (expires_at);
 
+CREATE TABLE IF NOT EXISTS user_settings (
+  user_id                INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  -- AES-256-GCM encrypted; stored as hex: iv:authTag:ciphertext
+  encrypted_groq_api_key TEXT,
+  created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Auto-delete expired transcriptions (called by cleanup job in server.js)
 -- SELECT delete_expired_transcriptions();
 CREATE OR REPLACE FUNCTION delete_expired_transcriptions()

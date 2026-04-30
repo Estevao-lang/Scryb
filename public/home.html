@@ -582,6 +582,33 @@
         const heroCta   = document.getElementById("hero-cta");
         const bottomBtn = document.getElementById("bottom-cta-btn");
 
+        if (!data.discordOAuthAvailable) {
+          if (data.authRequired) {
+            navArea.innerHTML = `<span class="land-nav-link">Discord login unavailable</span>`;
+            heroCta.innerHTML = `
+              <a href="#get-started" class="land-btn-secondary">Configure Discord OAuth</a>
+            `;
+            bottomBtn.href = "#get-started";
+            bottomBtn.textContent = "Configure Discord OAuth";
+            return;
+          }
+
+          navArea.innerHTML = `<a href="/app" class="land-nav-cta">Open app →</a>`;
+          heroCta.innerHTML = `
+            <a href="/app" class="land-btn-primary" style="font-size:1.05rem;padding:16px 36px">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Open Scryb
+            </a>
+            <a href="#get-started" class="land-btn-secondary">Get your free API key</a>
+          `;
+          bottomBtn.href = "/app";
+          bottomBtn.innerHTML = `
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Open Scryb →
+          `;
+          return;
+        }
+
         if (data.authenticated) {
           const u = data.user;
           // Nav: show avatar + logout
