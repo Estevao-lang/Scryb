@@ -608,7 +608,11 @@ app.post("/api/settings", async (req, res) => {
       return res.json({ ok: true });
     } catch (err) {
       console.error("[settings] user save failed:", err.message);
-      return res.status(500).json({ error: "Failed to save settings." });
+      return res.status(500).json({
+        error: process.env.NODE_ENV === "production"
+          ? "Failed to save settings."
+          : `Failed to save settings: ${err.message}`
+      });
     }
   }
 

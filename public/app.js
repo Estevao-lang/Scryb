@@ -322,7 +322,8 @@ settingsSave.addEventListener("click", async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
     });
-    if (!res.ok) throw new Error("Failed to save.");
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Failed to save.");
 
     keyStatus.textContent = "Saved successfully!";
     keyStatus.className = "key-status ok";
@@ -332,8 +333,8 @@ settingsSave.addEventListener("click", async () => {
       discordTokenInput.value = "";
     }
     setTimeout(closeSettings, 1200);
-  } catch {
-    keyStatus.textContent = "Failed to save. Please try again.";
+  } catch (err) {
+    keyStatus.textContent = err.message || "Failed to save. Please try again.";
     keyStatus.className = "key-status error";
   } finally {
     settingsSave.disabled = false;
