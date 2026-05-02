@@ -95,7 +95,7 @@ const createWindow = () => {
 
   startServer()
     .then(() => {
-      mainWindow.loadURL(`${BASE_URL}/`);
+      mainWindow.loadURL(`${BASE_URL}/app`);
     })
     .catch((err) => {
       mainWindow.loadFile(path.join(__dirname, "error.html"));
