@@ -737,6 +737,20 @@ const renderHistory = (entries) => {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Download .txt
           </button>
+          <button class="hist-report-btn" data-id="${e.id}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            Generate Report
+          </button>
+        </div>
+        <div class="hist-report-area" id="hist-report-${e.id}" hidden>
+          <div class="hist-report-header">
+            <span>Report</span>
+            <div class="hist-report-actions">
+              <button class="hist-report-copy" data-id="${e.id}">Copy</button>
+              <button class="hist-report-download" data-id="${e.id}">Download .md</button>
+            </div>
+          </div>
+          <pre class="hist-text hist-report-text" id="hist-report-text-${e.id}"></pre>
         </div>
       </div>
     </div>`;
@@ -776,6 +790,57 @@ historyList.addEventListener("click", (e) => {
     const a = document.createElement("a");
     a.href = url; a.download = `scryb-${date}.txt`; a.click();
     URL.revokeObjectURL(url);
+    return;
+  }
+
+  const reportBtn = e.target.closest(".hist-report-btn");
+  if (reportBtn) {
+    const id = reportBtn.dataset.id;
+    const area = document.getElementById(`hist-report-${id}`);
+    const textEl = document.getElementById(`hist-report-text-${id}`);
+    reportBtn.disabled = true;
+    reportBtn.textContent = "Generating...";
+    try {
+      const res = await fetch(`/api/report/${id}`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate report.");
+      textEl.textContent = data.report;
+      if (historyData[id]) historyData[id].report = data.report;
+      area.hidden = false;
+      reportBtn.textContent = "Regenerate Report";
+    } catch (err) {
+      reportBtn.textContent = "Generate Report";
+      alert(err.message);
+    } finally {
+      reportBtn.disabled = false;
+    }
+    return;
+  }
+
+  const reportCopy = e.target.closest(".hist-report-copy");
+  if (reportCopy) {
+    const textEl = document.getElementById(`hist-report-text-${reportCopy.dataset.id}`);
+    if (!textEl) return;
+    navigator.clipboard.writeText(textEl.textContent);
+    const orig = reportCopy.textContent;
+    reportCopy.textContent = "✓ Copied!";
+    setTimeout(() => { reportCopy.textContent = orig; }, 1500);
+    return;
+  }
+
+  const reportDl = e.target.closest(".hist-report-download");
+  if (reportDl) {
+    const id = reportDl.dataset.id;
+    const textEl = document.getElementById(`hist-report-text-${id}`);
+    if (!textEl || !textEl.textContent) return;
+    const entry = historyData[id];
+    const date = new Date(entry?.createdAt || Date.now()).toISOString().slice(0, 10);
+    const blob = new Blob([textEl.textContent], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `scryb-report-${date}.md`; a.click();
+    URL.revokeObjectURL(url);
+    return;
   }
 });
 
