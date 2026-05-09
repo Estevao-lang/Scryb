@@ -733,6 +733,21 @@ app.get("/api/transcrever/:jobId", (req, res) => {
   return res.json(serializeJob(job));
 });
 
+// ── Report on demand ─────────────────────────────────────────
+
+app.post("/api/report/:jobId", async (req, res) => {
+  const job = jobs.get(req.params.jobId);
+  if (!job) return res.status(404).json({ error: "Job not found." });
+  if (!job.resultText) return res.status(400).json({ error: "No transcription text available." });
+
+  const report = await generateReport(job.resultText, process.env.GROQ_API_KEY);
+  if (!report) return res.status(502).json({ error: "Failed to generate report. Check your Groq API key." });
+
+  job.report = report;
+  await persistJobs();
+  return res.json({ report });
+});
+
 // ── History ───────────────────────────────────────────────
 
 app.get("/api/historico", (req, res) => {

@@ -1177,6 +1177,50 @@ textarea::placeholder { color: rgba(96,96,160,0.45); }
   line-height: 1.7;
 }
 
+/* ── History report area ── */
+.hist-report-btn {
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s;
+}
+.hist-report-btn:hover { background: rgba(99,102,241,0.12); }
+.hist-report-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.hist-report-area {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.hist-report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+.hist-report-actions { display: flex; gap: 8px; }
+.hist-report-actions button {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.hist-report-actions button:hover { color: var(--text); border-color: var(--accent); }
+.hist-report-text { font-size: 0.78rem; }
+
 /* ── Responsive ── */
 @media (max-width: 720px) {
   .page { padding-top: 32px; }
