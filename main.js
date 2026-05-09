@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, shell, utilityProcess } = require("electron");
+const { app, BrowserWindow, Tray, Menu, nativeImage, shell, utilityProcess, ipcMain } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const net = require("net");
@@ -26,6 +26,18 @@ let BASE_URL = `http://localhost:${PORT}`;
 if (!fs.existsSync(ICON_PATH)) {
   try { require("./scripts/generate-icon.js"); } catch (e) { /* non-fatal */ }
 }
+
+// On first run, copy bundled default-settings.json to userData if settings.json doesn't exist yet
+const applyDefaultSettings = (userDataPath) => {
+  const settingsPath = path.join(userDataPath, "settings.json");
+  if (fs.existsSync(settingsPath)) return;
+  const defaultPath = path.join(appDir, "default-settings.json");
+  if (!fs.existsSync(defaultPath)) return;
+  try {
+    fs.mkdirSync(userDataPath, { recursive: true });
+    fs.copyFileSync(defaultPath, settingsPath);
+  } catch (e) { /* non-fatal */ }
+};
 
 let mainWindow = null;
 let tray = null;
@@ -84,7 +96,8 @@ const createWindow = () => {
     backgroundColor: "#07070f",
     webPreferences: {
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      preload: path.join(__dirname, "preload.js")
     },
     // Frameless feel on Windows — keep default frame for now
     autoHideMenuBar: true
@@ -95,7 +108,7 @@ const createWindow = () => {
 
   startServer()
     .then(() => {
-      mainWindow.loadURL(`${BASE_URL}/`);
+      mainWindow.loadURL(`${BASE_URL}/app`);
     })
     .catch((err) => {
       mainWindow.loadFile(path.join(__dirname, "error.html"));
@@ -150,6 +163,13 @@ const startRecorder = () => {
   });
 };
 
+ipcMain.on("open-external", (_, url) => {
+  shell.openExternal(url).then(() => {
+    // Yield focus to the external app — Electron sometimes steals it back
+    if (mainWindow) mainWindow.setAlwaysOnTop(false);
+  });
+});
+
 // Only one instance allowed — focus existing window if user opens a second
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -160,6 +180,7 @@ if (!gotLock) {
   });
 
   app.whenReady().then(async () => {
+    applyDefaultSettings(app.getPath("userData"));
     PORT = await getFreePort(3000);
     BASE_URL = `http://localhost:${PORT}`;
     createTray();

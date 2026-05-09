@@ -33,23 +33,69 @@
           <div id="key-status" class="key-status"></div>
         </div>
 
-        <div class="settings-section" style="margin-top:20px;padding-top:20px;border-top:1px solid var(--panel-border)">
-          <div class="settings-label-row">
-            <label for="discord-token-input">Discord Bot Token</label>
-            <a class="settings-link" href="https://discord.com/developers/applications" target="_blank">Create bot →</a>
-          </div>
-          <div class="key-input-row">
-            <input id="discord-token-input" type="password" placeholder="MTA..." autocomplete="off" spellcheck="false"/>
-            <button id="discord-token-toggle" class="icon-btn" aria-label="Show/hide token">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            </button>
-          </div>
-          <p class="settings-hint">Required for the Record tab. Enable <strong>Server Members</strong> and <strong>Voice States</strong> intents in the Developer Portal.</p>
-          <div id="discord-token-status" class="key-status"></div>
-        </div>
-
         <div class="settings-footer">
           <button id="settings-save" class="btn-primary">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tutorial modal -->
+    <div id="tutorial-overlay" class="tutorial-overlay" hidden>
+      <div class="tutorial-modal">
+        <div class="tutorial-header">
+          <h2>Como usar o Scryb</h2>
+          <button id="tutorial-close" class="icon-btn" aria-label="Fechar">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="tutorial-body">
+
+          <div class="tut-section">
+            <div class="tut-icon">📄</div>
+            <div class="tut-content">
+              <h3>Aba Transcribe</h3>
+              <p>Transcreva arquivos de áudio e vídeo com IA.</p>
+              <ul>
+                <li>Arraste <strong>arquivos individuais</strong> (MP3, WAV, OGG, FLAC, MP4…) ou uma <strong>pasta Craig</strong> para as zonas de upload</li>
+                <li>Escolha o <strong>idioma</strong>, formato e opções de transcrição</li>
+                <li>Use o campo <strong>Contexto</strong> com nomes de projetos, pessoas ou termos técnicos — aumenta a precisão</li>
+                <li>Clique <strong>Transcribe</strong> e aguarde o resultado</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="tut-section">
+            <div class="tut-icon">🎙️</div>
+            <div class="tut-content">
+              <h3>Aba Record</h3>
+              <p>Grave chamadas do Discord em tempo real.</p>
+              <ul>
+                <li>Adicione o <strong>bot ao servidor Discord</strong> usando o botão na aba (só precisa fazer uma vez)</li>
+                <li>Selecione o <strong>servidor</strong> e o <strong>canal de voz</strong> onde está a reunião</li>
+                <li>Clique <strong>Start Recording</strong> — o bot entra e grava cada participante separadamente</li>
+                <li>Clique <strong>Stop</strong> para encerrar e iniciar a transcrição automaticamente</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="tut-section">
+            <div class="tut-icon">🕐</div>
+            <div class="tut-content">
+              <h3>Aba Histórico</h3>
+              <p>Acesse e exporte transcrições concluídas.</p>
+              <ul>
+                <li>Lista todas as transcrições desta sessão</li>
+                <li>Clique <strong>ver</strong> para expandir o texto completo</li>
+                <li>Copie ou baixe como arquivo <strong>.txt</strong></li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="tut-tip">
+            <span class="tut-tip-icon">💡</span>
+            <div><strong>Dica:</strong> O campo <strong>Contexto</strong> aceita qualquer texto livre — cole nomes de pessoas, projetos, siglas ou termos técnicos da sua área para a IA acertar muito mais.</div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -144,12 +190,17 @@
       <section class="hero">
         <div class="logo-row">
           <img src="/logo.svg" alt="scryb" class="logo-svg" />
-          <button id="settings-btn" class="icon-btn settings-trigger" aria-label="Settings">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-            </svg>
-          </button>
+          <div class="logo-row-actions">
+            <button id="help-btn" class="icon-btn" aria-label="Tutorial">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17" stroke-width="3" stroke-linecap="round"/></svg>
+            </button>
+            <button id="settings-btn" class="icon-btn settings-trigger" aria-label="Settings">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+            </button>
+          </div>
         </div>
         <h1>Your call.<br>In text.<br><span class="gradient-text">Now.</span></h1>
         <p class="subtitle">
@@ -167,6 +218,10 @@
           <button class="tab" data-tab="record">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="6" fill="currentColor"/><circle cx="12" cy="12" r="10"/></svg>
             Record
+          </button>
+          <button class="tab" data-tab="historico">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Histórico
           </button>
         </div>
 
@@ -348,8 +403,12 @@
             </label>
             <div id="recorder-no-token" class="recorder-warning" hidden>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              Discord bot token not configured. <button class="inline-link" id="open-settings-from-rec">Open Settings →</button>
+              Token not configured. <button class="inline-link" id="open-settings-from-rec">Open Settings →</button>
             </div>
+            <button id="add-bot-btn" class="btn-add-bot" type="button" hidden>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.045.034.057a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+              Adicionar bot ao meu servidor
+            </button>
             <button id="start-record-btn" class="btn-record" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>
               Start Recording
@@ -400,6 +459,16 @@
             </section>
           </div>
         </div> <!-- /tab-record -->
+
+        <!-- ── Histórico tab ── -->
+        <div id="tab-historico" class="tab-panel" hidden>
+          <div id="history-list"></div>
+          <div id="history-empty" class="history-empty" hidden>
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            <p>Nenhuma transcrição ainda.</p>
+            <p>Complete uma transcrição para vê-la aqui.</p>
+          </div>
+        </div> <!-- /tab-historico -->
 
       </section>
     </main>

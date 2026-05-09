@@ -9,45 +9,60 @@ try {
 } catch {}
 
 require("dotenv").config({ path: require("path").join(__dirname, ".env") });
-const express  = require("express");
-const passport = require("passport");
-const multer   = require("multer");
+const express    = require("express");
+const multer     = require("multer");
 const ffmpegPath = require("ffmpeg-static");
-const path     = require("path");
-const os       = require("os");
-const fs       = require("fs/promises");
-const crypto   = require("crypto");
-const { spawn } = require("child_process");
-const auth     = require("./auth");
+const path       = require("path");
+const os         = require("os");
+const fs         = require("fs/promises");
+const crypto     = require("crypto");
+const { spawn }  = require("child_process");
 
 const app  = express();
 const port = process.env.PORT || 3000;
 app.use(express.json());
 
 // In Electron, USER_DATA_PATH is set to app.getPath("userData") — writable by the user.
-// Fall back to a local "storage" folder when running standalone (dev / Render).
-const userDataDir = process.env.USER_DATA_PATH || path.join(__dirname, "storage");
-const storageDir = userDataDir;
-const uploadDir = path.join(storageDir, "uploads");
-const jobsFile = path.join(storageDir, "jobs.json");
-const settingsFile = path.join(userDataDir, "settings.json");
+// Fall back to a local "storage" folder when running as plain Node server.
+const userDataDir     = process.env.USER_DATA_PATH || path.join(__dirname, "storage");
+const uploadDir       = path.join(userDataDir, "uploads");
+const jobsFile        = path.join(userDataDir, "jobs.json");
+const settingsFile    = path.join(userDataDir, "settings.json");
 // Use os.tmpdir() to guarantee a path without special characters for whisper-cli
-const audioDir = path.join(os.tmpdir(), "whisper-transcricao");
-const whisperDir = path.join(__dirname, "vendor", "whispercpp");
-const whisperBinDir = path.join(whisperDir, "bin", "Release");
-const whisperCliPath = path.join(whisperBinDir, "whisper-cli.exe");
+const audioDir        = path.join(os.tmpdir(), "whisper-transcricao");
+const whisperDir      = path.join(__dirname, "vendor", "whispercpp");
+const whisperBinDir   = path.join(whisperDir, "bin", "Release");
+const whisperCliPath  = path.join(whisperBinDir, "whisper-cli.exe");
 const whisperModelsDir = path.join(whisperDir, "models");
 
 const MAX_SAVED_JOBS = 100;
 
-// ── Settings ──────────────────────────────────────────────────
+// ── Settings (local file — no database) ──────────────────────
+
+// Strip "KEY=value" format if user accidentally pastes entire .env line
+const stripEnvPrefix = (v) => {
+  if (!v || typeof v !== "string") return "";
+  const t = v.trim();
+  const eq = t.indexOf("=");
+  if (eq > 0 && eq < 40 && /^[A-Z0-9_]+$/.test(t.slice(0, eq))) return t.slice(eq + 1).trim();
+  return t;
+};
 
 const loadSettings = async () => {
+  // Load bundled defaults first (token + clientId ship with the installer)
   try {
-    const raw = await fs.readFile(settingsFile, "utf8");
-    const settings = JSON.parse(raw);
-    if (settings.groqApiKey) process.env.GROQ_API_KEY = settings.groqApiKey;
-    if (settings.discordBotToken) process.env.DISCORD_BOT_TOKEN = settings.discordBotToken;
+    const defaults = JSON.parse(await fs.readFile(path.join(__dirname, "default-settings.json"), "utf8"));
+    if (defaults.discordBotToken) process.env.DISCORD_BOT_TOKEN = defaults.discordBotToken;
+    if (defaults.discordClientId) process.env.DISCORD_CLIENT_ID = defaults.discordClientId;
+  } catch { /* not present in dev without the file */ }
+
+  // User settings override defaults
+  try {
+    const settings = JSON.parse(await fs.readFile(settingsFile, "utf8"));
+    const groqKey     = stripEnvPrefix(settings.groqApiKey);
+    const discordToken = stripEnvPrefix(settings.discordBotToken);
+    if (groqKey)     process.env.GROQ_API_KEY      = groqKey;
+    if (discordToken && discordToken.length > 20) process.env.DISCORD_BOT_TOKEN = discordToken;
   } catch {
     // File doesn't exist yet — that's fine
   }
@@ -57,6 +72,8 @@ const saveSettings = async (settings) => {
   await fs.mkdir(userDataDir, { recursive: true });
   await fs.writeFile(settingsFile, JSON.stringify(settings, null, 2), "utf8");
 };
+
+// ── Upload validation ─────────────────────────────────────────
 
 const allowedMimeTypes = new Set([
   "audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav",
@@ -70,19 +87,18 @@ const allowedExtensions = new Set([
 ]);
 
 const modelLabels = {
-  "ggml-tiny.bin": "Tiny (75 MB) — fastest",
-  "ggml-base.bin": "Base (142 MB) — recommended",
-  "ggml-small.bin": "Small (466 MB) — better quality",
+  "ggml-tiny.bin":   "Tiny (75 MB) — fastest",
+  "ggml-base.bin":   "Base (142 MB) — recommended",
+  "ggml-small.bin":  "Small (466 MB) — better quality",
   "ggml-medium.bin": "Medium (1.5 GB) — high accuracy"
 };
 
-const jobs = new Map();
+// ── Job queue ─────────────────────────────────────────────────
 
-// ── Persistence ──────────────────────────────────────────────
+const jobs = new Map();
 
 const persistJobs = async () => {
   try {
-    // Only save terminal jobs (completed/failed) — processing can't be resumed
     const toSave = [...jobs.values()]
       .filter((j) => j.status === "completed" || j.status === "failed")
       .slice(-MAX_SAVED_JOBS)
@@ -92,7 +108,10 @@ const persistJobs = async () => {
         totalFiles: j.totalFiles,
         completedFiles: j.completedFiles,
         startedAt: j.startedAt,
+        createdAt: j.createdAt || j.startedAt || Date.now(),
         savedAt: Date.now(),
+        language: j.language || "portuguese",
+        source: j.source || "files",
         error: j.error || null,
         resultText: j.resultText || "",
         results: j.results || []
@@ -105,11 +124,9 @@ const persistJobs = async () => {
 
 const loadJobs = async () => {
   try {
-    const raw = await fs.readFile(jobsFile, "utf8");
+    const raw  = await fs.readFile(jobsFile, "utf8");
     const saved = JSON.parse(raw);
-    for (const j of saved) {
-      jobs.set(j.id, { ...j, currentFile: null });
-    }
+    for (const j of saved) jobs.set(j.id, { ...j, currentFile: null });
     console.log(`[jobs] ${saved.length} job(s) restored from disk.`);
   } catch {
     // File doesn't exist yet — that's fine
@@ -133,9 +150,9 @@ const estimateRemainingSeconds = (job) => {
   if (!job.startedAt) return null;
   const processedCount = job.completedFiles + (job.currentFile ? 1 : 0);
   if (processedCount <= 0) return null;
-  const elapsedSeconds = (Date.now() - job.startedAt) / 1000;
+  const elapsedSeconds      = (Date.now() - job.startedAt) / 1000;
   const averageSecondsPerFile = elapsedSeconds / processedCount;
-  const remainingFiles = Math.max(0, job.totalFiles - job.completedFiles);
+  const remainingFiles      = Math.max(0, job.totalFiles - job.completedFiles);
   return Math.ceil(averageSecondsPerFile * remainingFiles);
 };
 
@@ -160,14 +177,11 @@ const serializeJob = (job) => ({
 const cleanTranscription = (text) => {
   if (!text) return text;
 
-  // Patterns to remove entirely
-  const noiseOnly = /^(\s*[\[(]?(música de fundo|música|music|risos|laughter|applause|palmas|legenda\s+\w+(\s+\w+)?)[\])]?\s*[,.]?\s*)+$/i;
-  // Subtitle hallucination pattern: "Legenda Nome Sobrenome" repeated
+  const noiseOnly           = /^(\s*[\[(]?(música de fundo|música|music|risos|laughter|applause|palmas|legenda\s+\w+(\s+\w+)?)[\])]?\s*[,.]?\s*)+$/i;
   const subtitleHallucination = /^legenda\s+[A-ZÁÉÍÓÚÂÊÎÔÛÃÕÀÇ][a-záéíóúâêîôûãõàç]+(\s+[A-ZÁÉÍÓÚÂÊÎÔÛÃÕÀÇ][a-záéíóúâêîôûãõàç]+)*$/;
-  // Single short words/filler repeated (E aí E aí E aí)
-  const shortFiller = /^(e\s+aí|e\s+a\s+|aí|é+|sim+|não+)(\s+(e\s+aí|e\s+a\s+|aí|é+|sim+|não+)){2,}$/i;
+  const shortFiller         = /^(e\s+aí|e\s+a\s+|aí|é+|sim+|não+)(\s+(e\s+aí|e\s+a\s+|aí|é+|sim+|não+)){2,}$/i;
 
-  const lines = text.split("\n");
+  const lines   = text.split("\n");
   const cleaned = [];
 
   for (const line of lines) {
@@ -177,33 +191,32 @@ const cleanTranscription = (text) => {
     if (subtitleHallucination.test(trimmed)) continue;
     if (shortFiller.test(trimmed)) continue;
 
-    // Remove lines where a short phrase repeats 4+ times
     const loopPattern = /^(.{2,40}?)(\s+\1){3,}$/i;
     if (loopPattern.test(trimmed)) continue;
 
-    // Collapse inline "E aí E aí E aí" into single occurrence
     const collapsed = trimmed.replace(/(\bE\s+aí\b\s*){3,}/gi, "E aí... ");
-
     cleaned.push(collapsed);
   }
 
-  // Remove consecutive duplicate lines
   return cleaned.filter((line, i) => i === 0 || line !== cleaned[i - 1]).join("\n");
 };
 
-const refineWithGroq = async (text, language, apiKey = process.env.GROQ_API_KEY) => {
+const refineWithGroq = async (text, language, apiKey = process.env.GROQ_API_KEY, context = "") => {
   if (!apiKey || !text.trim()) return text;
 
   const languageNames = { portuguese: "português", english: "English", spanish: "español" };
   const langName = languageNames[language] || "português";
+  const contextSection = context
+    ? `\nTerms, names and keywords that MUST be preserved exactly: ${context}\n`
+    : "";
 
   const prompt = `You are an expert transcription editor. You received an automatic audio transcription in ${langName} produced by Whisper AI. Your task is to produce a clean, professional version suitable for reports and documentation.
-
+${contextSection}
 Rules:
 - Fix speech recognition errors (wrong words, homophones, invented words)
 - Remove filler words (uh, um, like, you know, né, então, tipo) and false starts
 - Fix punctuation, capitalization and paragraph breaks
-- Preserve technical terms, proper names and numbers exactly as spoken
+- Preserve technical terms, proper names, brand names and numbers exactly as spoken
 - Keep the original speaker's meaning — do not add, remove or change facts
 - Output ONLY the corrected text, no explanations, no headers
 
@@ -213,10 +226,7 @@ ${text}`;
   try {
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
-      },
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
         messages: [{ role: "user", content: prompt }],
@@ -224,12 +234,10 @@ ${text}`;
         max_tokens: 4096
       })
     });
-
     if (!response.ok) {
       console.error("[groq] error:", response.status, await response.text());
       return text;
     }
-
     const data = await response.json();
     return data.choices?.[0]?.message?.content?.trim() || text;
   } catch (err) {
@@ -244,13 +252,13 @@ const GROQ_MAX_BYTES = 24 * 1024 * 1024; // 24 MB (Groq limit is 25 MB)
 
 const convertToOgg = (inputPath, outputPath) =>
   new Promise((resolve, reject) => {
-    const args = [
+    const proc = spawn(ffmpegPath, [
       "-i", inputPath, "-vn",
-      "-c:a", "libvorbis", "-qscale:a", "2",
+      "-af", "loudnorm",
+      "-c:a", "libvorbis", "-qscale:a", "3",
       "-ar", "16000", "-ac", "1",
       "-y", outputPath
-    ];
-    const proc = spawn(ffmpegPath, args);
+    ]);
     let stderr = "";
     proc.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
     proc.on("error", reject);
@@ -263,7 +271,6 @@ const convertToOgg = (inputPath, outputPath) =>
 const transcribeWithGroqWhisper = async (inputPath, language, context, apiKey = process.env.GROQ_API_KEY) => {
   if (!apiKey) return null;
 
-  // Convert to small OGG to stay under Groq's 25 MB limit
   const oggPath = inputPath.replace(/\.\w+$/, ".ogg");
   try {
     await convertToOgg(inputPath, oggPath);
@@ -279,20 +286,21 @@ const transcribeWithGroqWhisper = async (inputPath, language, context, apiKey = 
       Blob: globalThis.Blob
     }));
 
-    // Build prompt hint: always include base language context + user-supplied context
     const languageHints = {
       portuguese: "Reunião em português brasileiro.",
       english: "Meeting in English.",
       spanish: "Reunión en español."
     };
-    const baseHint = languageHints[language] || languageHints.portuguese;
-    const promptText = context ? `${baseHint} ${context}` : baseHint;
+    const promptText = context
+      ? `${languageHints[language] || languageHints.portuguese} ${context}`
+      : (languageHints[language] || languageHints.portuguese);
 
     const form = new FormData();
     form.append("file", new Blob([fileBuffer], { type: "audio/ogg" }), "audio.ogg");
-    form.append("model", "whisper-large-v3-turbo");
+    form.append("model", "whisper-large-v3");
     form.append("response_format", "text");
     form.append("prompt", promptText);
+    form.append("temperature", "0");
     if (language && whisperLanguageMap[language]) {
       form.append("language", whisperLanguageMap[language]);
     }
@@ -323,7 +331,7 @@ const processJob = async (job, uploadedFiles, relativePaths, language, includeTi
   const convertedPaths = [];
 
   try {
-    job.status = "processing";
+    job.status    = "processing";
     job.startedAt = Date.now();
 
     for (const [index, file] of uploadedFiles.entries()) {
@@ -332,27 +340,21 @@ const processJob = async (job, uploadedFiles, relativePaths, language, includeTi
       convertedPaths.push(wavPath);
       await convertToWav(file.path, wavPath);
 
-      // Try Groq Whisper Large first; fall back to local whisper.cpp
       let rawText = await transcribeWithGroqWhisper(wavPath, language, context, groqApiKey);
-      let usedGroqWhisper = rawText !== null;
-
-      if (!usedGroqWhisper) {
+      if (rawText === null) {
         console.log("[transcription] using local whisper as fallback.");
         rawText = await transcribeWithWhisperCli(wavPath, language, includeTimestamps, modelFile, speedMode);
       }
 
       const cleanedText = cleanTranscription(rawText);
-      // Always refine with LLM for report-quality output
-      const resultText = await refineWithGroq(cleanedText, language, groqApiKey);
+      const resultText  = await refineWithGroq(cleanedText, language, groqApiKey, context);
 
       job.results.push({
-        fileName: file.originalname,
+        fileName:   file.originalname,
         sourcePath: relativePaths[index] || file.originalname,
-        text: resultText || ""
+        text:       resultText || ""
       });
       job.completedFiles += 1;
-
-      // Save progress after each file completes
       await persistJobs();
     }
 
@@ -363,38 +365,37 @@ const processJob = async (job, uploadedFiles, relativePaths, language, includeTi
     console.error(error);
     job.currentFile = null;
     job.status = "failed";
-    job.error = error.message || "Failed to transcribe the files.";
+    job.error  = error.message || "Failed to transcribe the files.";
   } finally {
     await Promise.allSettled([
       ...uploadedFiles.map((file) => removeFile(file.path)),
-      ...convertedPaths.map((filePath) => removeFile(filePath))
+      ...convertedPaths.map((p) => removeFile(p))
     ]);
     await persistJobs();
   }
 };
 
-// ── Storage & conversion ──────────────────────────────────────
+// ── Storage & audio conversion ────────────────────────────────
 
 const ensureStorage = async () => {
   await Promise.all([
     fs.mkdir(uploadDir, { recursive: true }),
-    fs.mkdir(audioDir, { recursive: true })
+    fs.mkdir(audioDir,  { recursive: true })
   ]);
 };
 
 const convertToWav = (inputPath, outputPath) =>
   new Promise((resolve, reject) => {
-    const args = [
+    const proc = spawn(ffmpegPath, [
       "-i", inputPath, "-vn",
       "-acodec", "pcm_s16le",
       "-ar", "16000", "-ac", "1",
       "-y", outputPath
-    ];
-    const process = spawn(ffmpegPath, args);
+    ]);
     let stderr = "";
-    process.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
-    process.on("error", reject);
-    process.on("close", (code) => {
+    proc.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
+    proc.on("error", reject);
+    proc.on("close", (code) => {
       if (code === 0) { resolve(); return; }
       reject(new Error(stderr || "Failed to convert file to WAV."));
     });
@@ -406,29 +407,25 @@ const sanitizeRelativePath = (value) => {
   if (typeof value !== "string") return "";
   return value
     .replace(/\\/g, "/")
+    .replace(/^\/+/, "")
     .split("/")
-    .filter((segment) => segment !== ".." && segment !== ".")
+    .filter((segment) => segment !== ".." && segment !== "." && segment !== "")
     .join("/");
 };
 
 const transcribeWithWhisperCli = (inputPath, language, includeTimestamps, modelFile, speedMode) =>
   new Promise((resolve, reject) => {
-    const modelRelPath = `../../models/${modelFile}`;
     const args = [
-      "-m", modelRelPath,
+      "-m", `../../models/${modelFile}`,
       "-l", whisperLanguageMap[language] || "auto",
       "-f", inputPath,
-      "-np",
-      "-t", "8",
-      "-et", "2.8",
-      "-lpt", "-0.5"
+      "-np", "-t", "8", "-et", "2.8", "-lpt", "-0.5"
     ];
     if (speedMode) args.push("-bs", "1", "-bo", "1");
     if (!includeTimestamps) args.push("-nt");
 
     const child = spawn(whisperCliPath, args, { cwd: whisperBinDir });
-    let stdout = "";
-    let stderr = "";
+    let stdout = "", stderr = "";
     child.stdout.on("data", (chunk) => { stdout += chunk.toString(); });
     child.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
     child.on("error", reject);
@@ -450,8 +447,8 @@ const upload = multer({
   dest: uploadDir,
   limits: { fileSize: 200 * 1024 * 1024 },
   fileFilter: (req, file, callback) => {
-    const extension = path.extname(file.originalname || "").toLowerCase();
-    if (allowedMimeTypes.has(file.mimetype) || allowedExtensions.has(extension)) {
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    if (allowedMimeTypes.has(file.mimetype) || allowedExtensions.has(ext)) {
       callback(null, true);
       return;
     }
@@ -459,161 +456,35 @@ const upload = multer({
   }
 });
 
-// ── Auth middleware (lazy — initialized in startup, applied here) ──
-// These refs are filled during startup before any request arrives
-const sessionMiddleware = (req, res, next) => (app.locals._session || ((r,s,n)=>n()))(req, res, next);
-const passportInit      = (req, res, next) => (app.locals._passportInit || ((r,s,n)=>n()))(req, res, next);
-const passportSession   = (req, res, next) => (app.locals._passportSession || ((r,s,n)=>n()))(req, res, next);
-const requireDiscordOAuth = (req, res, next) => {
-  if (app.locals.discordOAuthAvailable) return next();
-
-  return res.redirect(app.locals.dbAvailable ? "/?login=disabled" : "/app");
-};
-
-app.use(sessionMiddleware);
-app.use(passportInit);
-app.use(passportSession);
-
 // ── Routes ────────────────────────────────────────────────────
 
 const publicDir = path.resolve(__dirname, "public");
 
-// Landing page — always public
-app.get("/", (req, res) => res.sendFile(path.join(publicDir, "home.html")));
-
-// App — open if no DB, protected by session if DB available
-app.get("/app", (req, res, next) => {
-  if (!app.locals.dbAvailable) return res.sendFile(path.join(publicDir, "index.html"));
-  auth.requireAuth(req, res, () => res.sendFile(path.join(publicDir, "index.html")));
-});
+app.get("/",    (req, res) => res.redirect("/app"));
+app.get("/app", (req, res) => res.sendFile(path.join(publicDir, "index.html")));
 
 app.use(express.static(publicDir, { etag: false, maxAge: 0 }));
 
-// ── Auth routes ───────────────────────────────────────────────
-
-app.get("/auth/discord",
-  requireDiscordOAuth,
-  passport.authenticate("discord", { scope: ["identify", "guilds"] })
-);
-
-app.get("/auth/discord/callback",
-  requireDiscordOAuth,
-  (req, res, next) => {
-    passport.authenticate("discord", (err, user) => {
-      if (err) {
-        console.error("[auth] Discord callback failed:", err.message);
-        return res.redirect(`/?login=failed&reason=${encodeURIComponent(err.message)}`);
-      }
-
-      if (!user) return res.redirect("/?login=failed");
-
-      req.logIn(user, (loginErr) => {
-        if (loginErr) {
-          console.error("[auth] Discord login failed:", loginErr.message);
-          return next(loginErr);
-        }
-        return res.redirect("/app");
-      });
-    })(req, res, next);
-  }
-);
-
-app.get("/auth/logout", (req, res, next) => {
-  req.logout((err) => {
-    if (err) return next(err);
-    res.redirect("/");
-  });
-});
-
-app.get("/auth/me", (req, res) => {
-  const authInfo = {
-    discordOAuthAvailable: Boolean(app.locals.discordOAuthAvailable),
-    authRequired: Boolean(app.locals.dbAvailable)
-  };
-
-  if (!req.isAuthenticated()) {
-    return res.json({ authenticated: false, ...authInfo });
-  }
-
-  const { id, discord_id, username, avatar, discriminator } = req.user;
-  res.json({
-    authenticated: true,
-    ...authInfo,
-    user: {
-      id, discord_id, username, discriminator,
-      avatarUrl: avatar
-        ? `https://cdn.discordapp.com/avatars/${discord_id}/${avatar}.png?size=64`
-        : `https://cdn.discordapp.com/embed/avatars/${parseInt(discriminator || 0) % 5}.png`
-    }
-  });
-});
-
-// Transcription history (encrypted, only for authenticated users)
-app.get("/api/transcriptions", auth.requireAuth, async (req, res) => {
-  try {
-    const list = await auth.getUserTranscriptions(req.user.id);
-    res.json(list);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to load transcriptions" });
-  }
-});
+// ── Settings ──────────────────────────────────────────────────
 
 app.get("/api/settings", (req, res) => {
-  if (app.locals.dbAvailable && !req.isAuthenticated()) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
-  if (app.locals.dbAvailable) {
-    return auth.getUserSettings(req.user.id)
-      .then((settings) => {
-        const key = settings.groqApiKey || "";
-        const token = process.env.DISCORD_BOT_TOKEN || "";
-        const isCloud = !!(process.env.RENDER || process.env.RAILWAY_ENVIRONMENT);
-        res.json({
-          hasGroqKey: key.length > 0,
-          maskedKey: key.length > 8 ? `${key.slice(0, 8)}...` : null,
-          hasDiscordToken: token.length > 0,
-          recorderAvailable: !isCloud
-        });
-      })
-      .catch(() => res.status(500).json({ error: "Failed to load settings." }));
-  }
-
-  const key = process.env.GROQ_API_KEY || "";
-  const token = process.env.DISCORD_BOT_TOKEN || "";
-  // RENDER env var is set automatically on Render.com
-  const isCloud = !!(process.env.RENDER || process.env.RAILWAY_ENVIRONMENT);
+  const key      = process.env.GROQ_API_KEY      || "";
+  const token    = process.env.DISCORD_BOT_TOKEN || "";
+  const clientId = process.env.DISCORD_CLIENT_ID || "";
   res.json({
-    hasGroqKey: key.length > 0,
-    maskedKey: key.length > 8 ? `${key.slice(0, 8)}...` : null,
-    hasDiscordToken: token.length > 0,
-    recorderAvailable: !isCloud
+    hasGroqKey:        key.length > 0,
+    maskedKey:         key.length > 8 ? `${key.slice(0, 8)}...` : null,
+    hasDiscordToken:   token.length > 0,
+    discordClientId:   clientId,
+    recorderAvailable: true
   });
 });
 
 app.post("/api/settings", async (req, res) => {
   const { groqApiKey, discordBotToken } = req.body || {};
 
-  if (app.locals.dbAvailable && !req.isAuthenticated()) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
-  if (app.locals.dbAvailable) {
-    if (typeof groqApiKey !== "string" || !groqApiKey.trim()) {
-      return res.status(400).json({ error: "Groq API key is required." });
-    }
-
-    try {
-      await auth.saveUserSettings(req.user.id, { groqApiKey: groqApiKey.trim() });
-      return res.json({ ok: true });
-    } catch (err) {
-      console.error("[settings] user save failed:", err.message);
-      return res.status(500).json({
-        error: process.env.NODE_ENV === "production"
-          ? "Failed to save settings."
-          : `Failed to save settings: ${err.message}`
-      });
-    }
+  if (!groqApiKey && !discordBotToken) {
+    return res.status(400).json({ error: "No settings provided." });
   }
 
   const current = await fs.readFile(settingsFile, "utf8").then(JSON.parse).catch(() => ({}));
@@ -621,29 +492,30 @@ app.post("/api/settings", async (req, res) => {
 
   if (typeof groqApiKey === "string" && groqApiKey.trim()) {
     process.env.GROQ_API_KEY = groqApiKey.trim();
-    updated.groqApiKey = groqApiKey.trim();
+    updated.groqApiKey       = groqApiKey.trim();
   }
   if (typeof discordBotToken === "string" && discordBotToken.trim()) {
     process.env.DISCORD_BOT_TOKEN = discordBotToken.trim();
-    updated.discordBotToken = discordBotToken.trim();
+    updated.discordBotToken       = discordBotToken.trim();
   }
-  if (!groqApiKey && !discordBotToken) {
-    return res.status(400).json({ error: "No settings provided." });
+  // Always preserve the client ID from env if not already saved
+  if (!updated.discordClientId && process.env.DISCORD_CLIENT_ID) {
+    updated.discordClientId = process.env.DISCORD_CLIENT_ID;
   }
 
   await saveSettings(updated);
   res.json({ ok: true });
 });
 
-// ── Recorder proxy routes (forward to recorder.js on port 3001) ──
+// ── Recorder proxy (forwards to recorder.js on port 3001) ─────
 
 const RECORDER_URL = "http://127.0.0.1:3001";
 
-const proxyToRecorder = async (method, path, body) => {
-  const res = await fetch(`${RECORDER_URL}${path}`, {
+const proxyToRecorder = async (method, endpoint, body) => {
+  const res = await fetch(`${RECORDER_URL}${endpoint}`, {
     method,
     headers: body ? { "Content-Type": "application/json" } : {},
-    body: body ? JSON.stringify(body) : undefined
+    body:    body ? JSON.stringify(body) : undefined
   });
   return { status: res.status, data: await res.json() };
 };
@@ -658,15 +530,13 @@ app.get("/api/recorder/status", async (req, res) => {
 });
 
 app.post("/api/recorder/start", async (req, res) => {
-  if (app.locals.dbAvailable && !req.isAuthenticated()) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
   const token = process.env.DISCORD_BOT_TOKEN;
   if (!token) return res.status(400).json({ error: "Discord bot token not configured." });
 
-  const { guildId, channelId, language, context } = req.body || {};
-  if (!guildId || !channelId) return res.status(400).json({ error: "guildId and channelId are required." });
+  const { guildId, channelId } = req.body || {};
+  if (!guildId || !channelId) {
+    return res.status(400).json({ error: "guildId and channelId are required." });
+  }
 
   try {
     const { status, data } = await proxyToRecorder("POST", "/start", { guildId, channelId, token });
@@ -677,10 +547,6 @@ app.post("/api/recorder/start", async (req, res) => {
 });
 
 app.post("/api/recorder/stop", async (req, res) => {
-  if (app.locals.dbAvailable && !req.isAuthenticated()) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
   const { language = "portuguese", context = "" } = req.body || {};
 
   try {
@@ -689,33 +555,21 @@ app.post("/api/recorder/stop", async (req, res) => {
       return res.json({ jobId: null, message: "No audio was recorded." });
     }
 
-    // Build fake multer-style file objects pointing to the recorded WAVs
     const uploadedFiles = data.files.map(({ username, wavPath }) => ({
-      path: wavPath,
-      originalname: `${username}.wav`,
-      mimetype: "audio/wav"
+      path: wavPath, originalname: `${username}.wav`, mimetype: "audio/wav"
     }));
     const relativePaths = data.files.map(({ username }) => username);
 
     const job = {
-      id: crypto.randomUUID(),
-      status: "queued",
-      totalFiles: uploadedFiles.length,
-      completedFiles: 0,
-      currentFile: null,
-      startedAt: null,
-      error: null,
-      resultText: "",
-      results: [],
-      savedAt: null
+      id: crypto.randomUUID(), status: "queued",
+      totalFiles: uploadedFiles.length, completedFiles: 0,
+      currentFile: null, startedAt: null, createdAt: Date.now(),
+      language, source: "recorder",
+      error: null, resultText: "", results: [], savedAt: null
     };
 
     jobs.set(job.id, job);
-    const userSettings = app.locals.dbAvailable
-      ? await auth.getUserSettings(req.user.id)
-      : { groqApiKey: process.env.GROQ_API_KEY || "" };
-
-    void processJob(job, uploadedFiles, relativePaths, language, false, "ggml-tiny.bin", false, context, userSettings.groqApiKey);
+    void processJob(job, uploadedFiles, relativePaths, language, false, "ggml-tiny.bin", false, context, process.env.GROQ_API_KEY || "");
 
     return res.status(202).json({ jobId: job.id, ...serializeJob(job), channelName: data.channelName });
   } catch (err) {
@@ -723,8 +577,10 @@ app.post("/api/recorder/stop", async (req, res) => {
   }
 });
 
+// ── Transcription API ─────────────────────────────────────────
+
 app.get("/api/modelos", async (req, res) => {
-  const files = await fs.readdir(whisperModelsDir).catch(() => []);
+  const files  = await fs.readdir(whisperModelsDir).catch(() => []);
   const models = files
     .filter((f) => f.startsWith("ggml-") && f.endsWith(".bin"))
     .map((f) => ({ file: f, label: modelLabels[f] || f }));
@@ -732,61 +588,66 @@ app.get("/api/modelos", async (req, res) => {
 });
 
 app.post("/api/transcrever", upload.array("media", 20), async (req, res) => {
-  if (app.locals.dbAvailable && !req.isAuthenticated()) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
   const uploadedFiles = req.files || [];
-
   if (!uploadedFiles.length) {
     return res.status(400).json({ error: "Please upload at least one audio or video file." });
   }
 
-  const relativePaths = normalizeToArray(req.body.relativePath).map(sanitizeRelativePath);
-  const language = req.body.language || "portuguese";
+  const relativePaths     = normalizeToArray(req.body.relativePath).map(sanitizeRelativePath);
+  const language          = req.body.language || "portuguese";
   const includeTimestamps = req.body.outputFormat === "timestamps";
+  const speedMode         = req.body.speed === "fast";
+  const context           = typeof req.body.context === "string" ? req.body.context.slice(0, 500).trim() : "";
 
   const requestedModel = req.body.model || "ggml-tiny.bin";
-  const modelPath = path.join(whisperModelsDir, requestedModel);
-  const modelExists = await fs.access(modelPath).then(() => true).catch(() => false);
-  const modelFile = modelExists ? requestedModel : "ggml-tiny.bin";
-  const speedMode = req.body.speed === "fast";
-  const context = typeof req.body.context === "string" ? req.body.context.slice(0, 500).trim() : "";
-  const userSettings = app.locals.dbAvailable
-    ? await auth.getUserSettings(req.user.id)
-    : { groqApiKey: process.env.GROQ_API_KEY || "" };
+  const modelExists    = await fs.access(path.join(whisperModelsDir, requestedModel)).then(() => true).catch(() => false);
+  const modelFile      = modelExists ? requestedModel : "ggml-tiny.bin";
 
+  const source = relativePaths.some(p => p.includes("/")) ? "craig" : "files";
   const job = {
-    id: crypto.randomUUID(),
-    status: "queued",
-    totalFiles: uploadedFiles.length,
-    completedFiles: 0,
-    currentFile: null,
-    startedAt: null,
-    error: null,
-    resultText: "",
-    results: [],
-    savedAt: null
+    id: crypto.randomUUID(), status: "queued",
+    totalFiles: uploadedFiles.length, completedFiles: 0,
+    currentFile: null, startedAt: null, createdAt: Date.now(),
+    language, source,
+    error: null, resultText: "", results: [], savedAt: null
   };
 
   jobs.set(job.id, job);
-  void processJob(job, uploadedFiles, relativePaths, language, includeTimestamps, modelFile, speedMode, context, userSettings.groqApiKey);
+  void processJob(job, uploadedFiles, relativePaths, language, includeTimestamps, modelFile, speedMode, context, process.env.GROQ_API_KEY || "");
 
   return res.status(202).json({ jobId: job.id, ...serializeJob(job) });
 });
 
 app.get("/api/transcrever/:jobId", (req, res) => {
   const job = jobs.get(req.params.jobId);
-  if (!job) {
-    return res.status(404).json({ error: "Transcription job not found." });
-  }
+  if (!job) return res.status(404).json({ error: "Transcription job not found." });
   return res.json(serializeJob(job));
 });
 
+// ── History ───────────────────────────────────────────────
+
+app.get("/api/historico", (req, res) => {
+  const list = [...jobs.values()]
+    .filter(j => j.status === "completed" || j.status === "failed")
+    .sort((a, b) => (b.createdAt || b.savedAt || 0) - (a.createdAt || a.savedAt || 0))
+    .map(j => ({
+      id: j.id,
+      status: j.status,
+      createdAt: j.createdAt || j.savedAt || null,
+      language: j.language || "portuguese",
+      source: j.source || "files",
+      totalFiles: j.totalFiles,
+      resultText: j.resultText || "",
+      error: j.error || null,
+    }));
+  res.json(list);
+});
+
+// ── Error handler ─────────────────────────────────────────────
+
 app.use((error, req, res, next) => {
   if (!error) { next(); return; }
-  const isMulterLimit = error.code === "LIMIT_FILE_SIZE";
-  const message = isMulterLimit
+  const message = error.code === "LIMIT_FILE_SIZE"
     ? "File exceeds the 200 MB limit."
     : error.message || "Failed to process the file.";
   res.status(400).json({ error: message });
@@ -798,49 +659,29 @@ ensureStorage()
   .then(async () => {
     await loadSettings();
 
-    // Auth + DB — session/passport MUST be registered before routes are hit
-    const dbAvailable = await auth.checkDb();
-    app.locals.dbAvailable = dbAvailable;
-
-    // Always configure passport strategy (needed for OAuth routes)
-    auth.configurePassport();
-    app.locals.discordOAuthAvailable = Boolean(dbAvailable && process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET);
-    // Store middlewares in app.locals — picked up by lazy wrappers registered before routes
-    app.locals._session         = auth.buildSessionMiddleware(dbAvailable);
-    app.locals._passportInit    = passport.initialize();
-    app.locals._passportSession = passport.session();
-
-    if (dbAvailable) {
-      setInterval(auth.deleteExpired, 60 * 60 * 1000);
-      auth.deleteExpired();
-      console.log("[db] connected — auth enabled");
-    } else {
-      console.log("[db] no DATABASE_URL — running without persistent sessions");
-    }
-
-    // whisper-cli is optional — Groq Whisper is the primary engine
     const whisperAvailable = await fs.access(whisperCliPath).then(() => true).catch(() => false);
     if (!whisperAvailable) {
       console.warn("[whisper] whisper-cli.exe not found — using Groq Whisper only.");
     }
+
     await loadJobs();
+
     const server = app.listen(port, () => {
       console.log(`Server running at http://localhost:${port}`);
     });
+
     server.on("error", (err) => {
       if (err.code === "EADDRINUSE") {
         console.error(`[server] Port ${port} in use, retrying on ${port + 1}`);
         server.close();
-        app.listen(port + 1, () => {
-          console.log(`Server running at http://localhost:${port + 1}`);
-        });
+        app.listen(port + 1, () => console.log(`Server running at http://localhost:${port + 1}`));
       } else {
         console.error("[server] Fatal:", err);
         process.exit(1);
       }
     });
   })
-  .catch((error) => {
-    console.error("Failed to prepare application directories.", error);
+  .catch((err) => {
+    console.error("Failed to prepare application directories.", err);
     process.exit(1);
   });

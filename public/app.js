@@ -266,6 +266,16 @@ document.querySelectorAll(".tab").forEach((btn) => {
   });
 });
 
+// ── Tutorial modal ────────────────────────────────────────────
+
+const helpBtn         = document.getElementById("help-btn");
+const tutorialOverlay = document.getElementById("tutorial-overlay");
+const tutorialClose   = document.getElementById("tutorial-close");
+
+helpBtn.addEventListener("click", () => { tutorialOverlay.hidden = false; });
+tutorialClose.addEventListener("click", () => { tutorialOverlay.hidden = true; });
+tutorialOverlay.addEventListener("click", (e) => { if (e.target === tutorialOverlay) tutorialOverlay.hidden = true; });
+
 // ── Settings modal ────────────────────────────────────────────
 
 const settingsOverlay  = document.getElementById("settings-overlay");
@@ -290,20 +300,11 @@ keyToggle.addEventListener("click", () => {
   groqKeyInput.type = groqKeyInput.type === "password" ? "text" : "password";
 });
 
-const discordTokenInput  = document.getElementById("discord-token-input");
-const discordTokenToggle = document.getElementById("discord-token-toggle");
-const discordTokenStatus = document.getElementById("discord-token-status");
-
-discordTokenToggle.addEventListener("click", () => {
-  discordTokenInput.type = discordTokenInput.type === "password" ? "text" : "password";
-});
-
 settingsSave.addEventListener("click", async () => {
-  const key   = groqKeyInput.value.trim();
-  const token = discordTokenInput.value.trim();
+  const key = groqKeyInput.value.trim();
 
-  if (!key && !token) {
-    keyStatus.textContent = "Enter at least one value to save.";
+  if (!key) {
+    keyStatus.textContent = "Paste your Groq API key to save.";
     keyStatus.className = "key-status error";
     return;
   }
@@ -313,25 +314,18 @@ settingsSave.addEventListener("click", async () => {
   keyStatus.className = "key-status";
 
   try {
-    const body = {};
-    if (key)   body.groqApiKey       = key;
-    if (token) body.discordBotToken  = token;
-
     const res = await fetch("/api/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
+      body: JSON.stringify({ groqApiKey: key })
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || "Failed to save.");
 
     keyStatus.textContent = "Saved successfully!";
     keyStatus.className = "key-status ok";
-    if (key)   { setupBanner.hidden = true; groqKeyInput.value = ""; }
-    if (token) {
-      document.getElementById("recorder-no-token").hidden = true;
-      discordTokenInput.value = "";
-    }
+    setupBanner.hidden = true;
+    groqKeyInput.value = "";
     setTimeout(closeSettings, 1200);
   } catch (err) {
     keyStatus.textContent = err.message || "Failed to save. Please try again.";
@@ -367,11 +361,9 @@ const saveObSettings = async (groqApiKey, discordBotToken) => {
 const finishOnboarding = () => {
   localStorage.setItem("scryb_onboarded", "1");
   onboardingOverlay.hidden = true;
-  // Refresh settings state
   fetch("/api/settings").then(r => r.json()).then(s => {
     if (!s.hasGroqKey) setupBanner.hidden = false;
-    if (!s.hasDiscordToken) document.getElementById("recorder-no-token").hidden = false;
-    else document.getElementById("recorder-no-token").hidden = true;
+    document.getElementById("recorder-no-token").hidden = s.hasDiscordToken;
   }).catch(() => {});
 };
 
@@ -393,11 +385,15 @@ document.getElementById("ob-groq-save").addEventListener("click", async () => {
   status.textContent = "Saving..."; status.className = "ob-status";
   await saveObSettings(key, null);
   status.textContent = "✓ Saved!"; status.className = "ob-status";
-  setTimeout(() => showObStep(2), 600);
+  const s = await fetch("/api/settings").then(r => r.json()).catch(() => ({}));
+  setTimeout(() => s.hasDiscordToken ? finishOnboarding() : showObStep(2), 600);
 });
 
 // Step 1 skip
-document.getElementById("ob-groq-skip").addEventListener("click", () => showObStep(2));
+document.getElementById("ob-groq-skip").addEventListener("click", async () => {
+  const s = await fetch("/api/settings").then(r => r.json()).catch(() => ({}));
+  if (s.hasDiscordToken) { finishOnboarding(); } else { showObStep(2); }
+});
 
 // Step 2 toggles
 document.getElementById("ob-discord-toggle").addEventListener("click", () => {
@@ -421,6 +417,18 @@ document.getElementById("ob-discord-save").addEventListener("click", async () =>
 // Step 2 skip
 document.getElementById("ob-discord-skip").addEventListener("click", finishOnboarding);
 
+const addBotBtn = document.getElementById("add-bot-btn");
+let botInviteUrl = "https://discord.com/oauth2/authorize?client_id=1497296876565954561&scope=bot&permissions=3145728";
+
+addBotBtn.addEventListener("click", () => {
+  if (!botInviteUrl) return;
+  if (window.electronAPI) {
+    window.electronAPI.openExternal(botInviteUrl);
+  } else {
+    window.open(botInviteUrl, "_blank");
+  }
+});
+
 // Check on load — show onboarding or banner
 fetch("/api/settings")
   .then((r) => r.json())
@@ -430,12 +438,19 @@ fetch("/api/settings")
       document.querySelector('[data-tab="record"]').hidden = true;
     }
 
+    // Show "Add bot to server" button if client ID is available
+    if (s.discordClientId) {
+      botInviteUrl = `https://discord.com/oauth2/authorize?client_id=${s.discordClientId}&scope=bot&permissions=3145728`;
+      addBotBtn.hidden = false;
+    }
+
     const onboarded = localStorage.getItem("scryb_onboarded");
     if (!onboarded && !s.hasGroqKey) {
       onboardingOverlay.hidden = false;
       showObStep(0);
     } else {
       if (!s.hasGroqKey) setupBanner.hidden = false;
+      // Only show "no token" warning if token is truly missing (not pre-bundled)
       if (!s.hasDiscordToken && s.recorderAvailable !== false) {
         document.getElementById("recorder-no-token").hidden = false;
       }
@@ -629,6 +644,120 @@ if (savedJobId) {
     })
     .finally(() => { submitButton.disabled = false; });
 }
+
+// ── Histórico tab ─────────────────────────────────────────
+
+const historyList  = document.getElementById("history-list");
+const historyEmpty = document.getElementById("history-empty");
+let historyData = {};
+
+const escapeHtml = (s) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+const histSourceLabels = { craig: "Craig folder", files: "Individual files", recorder: "Discord recording" };
+const histLangLabels   = { portuguese: "Português", english: "English", spanish: "Español" };
+
+const histFormatDate = (ts) => {
+  if (!ts) return "";
+  const d = new Date(ts);
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
+    + " às " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+};
+
+const renderHistory = (entries) => {
+  historyData = {};
+  entries.forEach(e => { historyData[e.id] = e; });
+
+  if (!entries.length) {
+    historyList.innerHTML = "";
+    historyEmpty.hidden = false;
+    return;
+  }
+  historyEmpty.hidden = true;
+
+  historyList.innerHTML = entries.map(e => {
+    const ok = e.status === "completed";
+    const badge = ok
+      ? '<span class="hist-badge hist-badge--ok">concluído</span>'
+      : '<span class="hist-badge hist-badge--error">erro</span>';
+    const hasText = ok && e.resultText && e.resultText.trim();
+    const files = `${e.totalFiles} arquivo${e.totalFiles !== 1 ? "s" : ""}`;
+
+    return `<div class="hist-card">
+      <div class="hist-meta">
+        <div class="hist-info">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <span>${files} · ${histLangLabels[e.language] || e.language} · ${histSourceLabels[e.source] || e.source}</span>
+        </div>
+        <div class="hist-right">
+          <span class="hist-date">${histFormatDate(e.createdAt)}</span>
+          ${badge}
+          ${hasText ? `<button class="hist-toggle" data-id="${e.id}" aria-expanded="false">▸ ver</button>` : ""}
+        </div>
+      </div>
+      <div class="hist-body" id="hist-body-${e.id}" hidden>
+        <pre class="hist-text">${escapeHtml(e.resultText)}</pre>
+        <div class="hist-actions">
+          <button class="hist-copy" data-id="${e.id}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy
+          </button>
+          <button class="hist-download" data-id="${e.id}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download .txt
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+};
+
+historyList.addEventListener("click", (e) => {
+  const toggle = e.target.closest(".hist-toggle");
+  if (toggle) {
+    const id = toggle.dataset.id;
+    const body = document.getElementById(`hist-body-${id}`);
+    const expanded = toggle.getAttribute("aria-expanded") === "true";
+    toggle.setAttribute("aria-expanded", String(!expanded));
+    toggle.textContent = expanded ? "▸ ver" : "▾ fechar";
+    body.hidden = expanded;
+    return;
+  }
+
+  const copyBtn = e.target.closest(".hist-copy");
+  if (copyBtn) {
+    const entry = historyData[copyBtn.dataset.id];
+    if (!entry) return;
+    navigator.clipboard.writeText(entry.resultText);
+    const orig = copyBtn.innerHTML;
+    copyBtn.textContent = "✓ Copiado!";
+    setTimeout(() => { copyBtn.innerHTML = orig; }, 1500);
+    return;
+  }
+
+  const dlBtn = e.target.closest(".hist-download");
+  if (dlBtn) {
+    const entry = historyData[dlBtn.dataset.id];
+    if (!entry) return;
+    const date = new Date(entry.createdAt || Date.now()).toISOString().slice(0, 10);
+    const blob = new Blob([entry.resultText], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `scryb-${date}.txt`; a.click();
+    URL.revokeObjectURL(url);
+  }
+});
+
+document.querySelector('[data-tab="historico"]').addEventListener("click", async () => {
+  historyList.innerHTML = '<p class="hist-loading">Carregando...</p>';
+  historyEmpty.hidden = true;
+  try {
+    const res = await fetch("/api/historico");
+    renderHistory(await res.json());
+  } catch {
+    historyList.innerHTML = '<p style="color:var(--error);padding:16px 0">Erro ao carregar histórico.</p>';
+  }
+});
 
 // Load available models from server
 fetch("/api/modelos")
