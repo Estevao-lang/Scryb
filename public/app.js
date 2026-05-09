@@ -18,6 +18,10 @@ const contextInput = document.getElementById("context");
 const submitButton = document.getElementById("submit-button");
 const copyButton = document.getElementById("copy-button");
 const downloadButton = document.getElementById("download-button");
+const reportSection     = document.getElementById("report-section");
+const reportResult      = document.getElementById("report-result");
+const reportCopyBtn     = document.getElementById("report-copy-btn");
+const reportDownloadBtn = document.getElementById("report-download-btn");
 
 const supportedExtensions = new Set([".mp3", ".wav", ".flac", ".m4a", ".mp4", ".webm", ".ogg", ".mov", ".m4v"]);
 let pollTimer;
@@ -221,6 +225,7 @@ form.addEventListener("submit", async (event) => {
     renderProgressFromJob(finishedJob);
     updateStatus(`${finishedJob.totalFiles} file(s) transcribed successfully.`);
     setResultActions(Boolean(resultField.value));
+    showReport(finishedJob.report);
     sessionStorage.removeItem("activeJobId");
   } catch (error) {
     hideProgress();
@@ -252,6 +257,32 @@ downloadButton.addEventListener("click", () => {
 
 updateSelectionSummary();
 hideProgress();
+
+// ── Report ────────────────────────────────────────────────────
+
+const showReport = (reportText) => {
+  if (!reportText) { reportSection.hidden = true; return; }
+  reportResult.value = reportText;
+  reportSection.hidden = false;
+};
+
+reportCopyBtn.addEventListener("click", async () => {
+  await navigator.clipboard.writeText(reportResult.value);
+  const orig = reportCopyBtn.innerHTML;
+  reportCopyBtn.textContent = "✓ Copied!";
+  setTimeout(() => { reportCopyBtn.innerHTML = orig; }, 1500);
+});
+
+reportDownloadBtn.addEventListener("click", () => {
+  const date = new Date().toISOString().slice(0, 10);
+  const blob = new Blob([reportResult.value], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `scryb-report-${date}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
 
 // ── Tab switcher ──────────────────────────────────────────────
 

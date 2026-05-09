@@ -114,7 +114,8 @@ const persistJobs = async () => {
         source: j.source || "files",
         error: j.error || null,
         resultText: j.resultText || "",
-        results: j.results || []
+        results: j.results || [],
+        report: j.report || null
       }));
     await fs.writeFile(jobsFile, JSON.stringify(toSave, null, 2), "utf8");
   } catch (err) {
@@ -169,8 +170,115 @@ const serializeJob = (job) => ({
   error: job.error,
   resultText: job.resultText,
   results: job.results,
+  report: job.report || null,
   savedAt: job.savedAt || null
 });
+
+// ── Report generation ─────────────────────────────────────────
+
+const REPORT_SYSTEM_PROMPT = `You are a professional technical report writer for SnaveUK, a UK-based software organization.
+
+Your task is to analyse Discord voice call transcriptions and produce a clean, structured markdown report covering ONLY project-related discussions. You must ignore all personal conversations, jokes, off-topic chat, birthday discussions, and background noise artifacts from the transcription.
+
+## Rules
+
+1. **Language:** Always write in English, even if the transcription is in Portuguese.
+2. **Format:** Markdown only. Use headers (##, ###), bullet points, tables, and code blocks where appropriate.
+3. **Content filter:** Extract ONLY discussions about the project — technical decisions, implementation details, action items, blockers, and status updates. Ignore everything else entirely.
+4. **No fabrication:** Only report what was actually discussed. If the transcription is unclear or garbled, skip that part — never invent information.
+5. **Transcription quality:** These are auto-transcribed audio files with errors, mixed languages (Portuguese/English), and artifacts like "Legenda Adriana Zanotto", "[música]", "E aí", repeated filler words, etc. Ignore all of these.
+6. **Speaker identification:** The transcription filenames contain Discord usernames. Map them to real names:
+   - steveeen1457 = Estevão (Tech Lead)
+   - jaum_ = João Morais (Game Logic / Score System)
+   - forunculo_ = Mateus Soares Storalli (Backend / Multiplayer / Database)
+   - rduaik = Ricardo (Unity Art / UI)
+   If other speakers appear, refer to them by their Discord username.
+
+## Report Structure
+
+Use this exact structure for every report:
+
+\`\`\`markdown
+# {Project Name}
+## {Report Type} — {Brief Description}
+
+**Date:** {Month Year}
+**Project:** {Full Project Name}
+**Attendees:** {Names extracted from transcription}
+**Source:** Discord voice call (transcribed)
+
+---
+
+## 1. {Main Topic}
+
+{Description of what was discussed}
+
+### {Sub-topic if needed}
+
+- Bullet points for details
+- Technical decisions made
+- Code/URLs/endpoints discussed
+
+---
+
+## N. Action Items
+
+| Owner | Action | Priority |
+|---|---|---|
+| {Name} | {What they need to do} | High/Medium/Low |
+
+---
+
+## N+1. Key Decisions
+
+1. **{Decision}:** {Brief explanation}
+
+---
+
+*Report generated from Discord call transcript — SnaveUK / {Project Name}*
+\`\`\`
+
+## Active Projects (for context)
+
+- **Castleman Books** — Flask/PyWebView/PyInstaller desktop app for eBay inventory management. Client: Adam. Stack: AWS Step Functions, Lambda, PostgreSQL, eBay API, Google Vision OCR.
+- **Penalty Shootout Football Trivia Challenge** — Unity 6/C# mobile game. Team: João (game logic), Mateus (backend/multiplayer), Ricardo (art/UI). Stack: Unity, Mirror networking, PostgreSQL via Neon.
+- **Maitrics** — B2B SaaS brand analytics platform. Stack: AWS Lambda, Aurora MySQL, Cognito, DynamoDB, Next.js, LangGraph.`;
+
+const generateReport = async (transcriptionText, apiKey = process.env.GROQ_API_KEY) => {
+  if (!apiKey || !transcriptionText.trim()) return null;
+
+  const userMessage = `Here is a Discord voice call transcription from the SnaveUK project team.
+
+Generate a structured markdown report covering only the project-related discussions. Ignore all personal conversations, jokes, and transcription artifacts.
+
+TRANSCRIPTION:
+${transcriptionText}`;
+
+  try {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          { role: "system", content: REPORT_SYSTEM_PROMPT },
+          { role: "user", content: userMessage }
+        ],
+        temperature: 0.3,
+        max_tokens: 4096
+      })
+    });
+    if (!response.ok) {
+      console.error("[report] groq error:", response.status);
+      return null;
+    }
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content?.trim() || null;
+  } catch (err) {
+    console.error("[report] failed:", err.message);
+    return null;
+  }
+};
 
 // ── Transcription cleanup ─────────────────────────────────────
 
@@ -360,6 +468,7 @@ const processJob = async (job, uploadedFiles, relativePaths, language, includeTi
 
     job.resultText = formatResultsAsText(job.results);
     job.currentFile = null;
+    job.report = await generateReport(job.resultText, groqApiKey);
     job.status = "completed";
   } catch (error) {
     console.error(error);
