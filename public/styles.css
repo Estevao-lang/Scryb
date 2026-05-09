@@ -1164,6 +1164,19 @@ textarea::placeholder { color: rgba(96,96,160,0.45); }
 .tut-tip-icon { font-size: 1rem; flex-shrink: 0; padding-top: 1px; }
 .tut-tip strong { color: var(--accent); }
 
+/* ── Report section ── */
+.report-section {
+  margin-top: 24px;
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+}
+.report-section #report-result {
+  min-height: 280px;
+  font-family: "Courier New", monospace;
+  font-size: 0.8rem;
+  line-height: 1.7;
+}
+
 /* ── Responsive ── */
 @media (max-width: 720px) {
   .page { padding-top: 32px; }
