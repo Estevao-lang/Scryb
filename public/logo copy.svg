@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 40" fill="none">
+  <defs>
+    <linearGradient id="mark-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7c5cfc"/>
+      <stop offset="100%" stop-color="#4a2fcf"/>
+    </linearGradient>
+    <linearGradient id="wave-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7c5cfc"/>
+      <stop offset="100%" stop-color="#00d4ff"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Logo mark: rounded square -->
+  <rect x="0" y="4" width="32" height="32" rx="9" fill="url(#mark-bg)"/>
+
+  <!-- S letter -->
+  <text
+    x="16" y="27"
+    font-family="'Segoe UI', system-ui, sans-serif"
+    font-size="20"
+    font-weight="800"
+    fill="white"
+    text-anchor="middle"
+  >S</text>
+
+  <!-- Cyan accent dot -->
+  <circle cx="27" cy="8" r="3" fill="#00d4ff" opacity="0.9" filter="url(#glow)"/>
+
+  <!-- Wordmark: scryb -->
+  <text
+    x="44" y="27"
+    font-family="'Segoe UI', system-ui, sans-serif"
+    font-size="20"
+    font-weight="700"
+    fill="#eaeaf5"
+    letter-spacing="-0.5"
+  >scryb</text>
+
+  <!-- Waveform accent under wordmark -->
+  <g transform="translate(44, 33)" opacity="0.6">
+    <rect x="0"  y="0" width="3" height="3" rx="1.5" fill="url(#wave-grad)"/>
+    <rect x="5"  y="-1" width="3" height="5" rx="1.5" fill="url(#wave-grad)"/>
+    <rect x="10" y="-3" width="3" height="7" rx="1.5" fill="url(#wave-grad)"/>
+    <rect x="15" y="-1" width="3" height="5" rx="1.5" fill="url(#wave-grad)"/>
+    <rect x="20" y="0" width="3" height="3" rx="1.5" fill="url(#wave-grad)"/>
+    <rect x="25" y="-2" width="3" height="6" rx="1.5" fill="url(#wave-grad)"/>
+    <rect x="30" y="0" width="3" height="3" rx="1.5" fill="url(#wave-grad)"/>
+    <rect x="35" y="-1" width="3" height="4" rx="1.5" fill="url(#wave-grad)"/>
+    <rect x="40" y="0" width="3" height="2" rx="1" fill="url(#wave-grad)"/>
+  </g>
+</svg>
