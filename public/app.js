@@ -757,7 +757,7 @@ const renderHistory = (entries) => {
   }).join("");
 };
 
-historyList.addEventListener("click", (e) => {
+historyList.addEventListener("click", async (e) => {
   const toggle = e.target.closest(".hist-toggle");
   if (toggle) {
     const id = toggle.dataset.id;
