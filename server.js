@@ -39,12 +39,30 @@ const MAX_SAVED_JOBS = 100;
 
 // ── Settings (local file — no database) ──────────────────────
 
+// Strip "KEY=value" format if user accidentally pastes entire .env line
+const stripEnvPrefix = (v) => {
+  if (!v || typeof v !== "string") return "";
+  const t = v.trim();
+  const eq = t.indexOf("=");
+  if (eq > 0 && eq < 40 && /^[A-Z0-9_]+$/.test(t.slice(0, eq))) return t.slice(eq + 1).trim();
+  return t;
+};
+
 const loadSettings = async () => {
+  // Load bundled defaults first (token + clientId ship with the installer)
   try {
-    const raw = await fs.readFile(settingsFile, "utf8");
-    const settings = JSON.parse(raw);
-    if (settings.groqApiKey)      process.env.GROQ_API_KEY      = settings.groqApiKey;
-    if (settings.discordBotToken) process.env.DISCORD_BOT_TOKEN = settings.discordBotToken;
+    const defaults = JSON.parse(await fs.readFile(path.join(__dirname, "default-settings.json"), "utf8"));
+    if (defaults.discordBotToken) process.env.DISCORD_BOT_TOKEN = defaults.discordBotToken;
+    if (defaults.discordClientId) process.env.DISCORD_CLIENT_ID = defaults.discordClientId;
+  } catch { /* not present in dev without the file */ }
+
+  // User settings override defaults
+  try {
+    const settings = JSON.parse(await fs.readFile(settingsFile, "utf8"));
+    const groqKey     = stripEnvPrefix(settings.groqApiKey);
+    const discordToken = stripEnvPrefix(settings.discordBotToken);
+    if (groqKey)     process.env.GROQ_API_KEY      = groqKey;
+    if (discordToken && discordToken.length > 20) process.env.DISCORD_BOT_TOKEN = discordToken;
   } catch {
     // File doesn't exist yet — that's fine
   }
@@ -90,7 +108,10 @@ const persistJobs = async () => {
         totalFiles: j.totalFiles,
         completedFiles: j.completedFiles,
         startedAt: j.startedAt,
+        createdAt: j.createdAt || j.startedAt || Date.now(),
         savedAt: Date.now(),
+        language: j.language || "portuguese",
+        source: j.source || "files",
         error: j.error || null,
         resultText: j.resultText || "",
         results: j.results || []
@@ -180,19 +201,22 @@ const cleanTranscription = (text) => {
   return cleaned.filter((line, i) => i === 0 || line !== cleaned[i - 1]).join("\n");
 };
 
-const refineWithGroq = async (text, language, apiKey = process.env.GROQ_API_KEY) => {
+const refineWithGroq = async (text, language, apiKey = process.env.GROQ_API_KEY, context = "") => {
   if (!apiKey || !text.trim()) return text;
 
   const languageNames = { portuguese: "português", english: "English", spanish: "español" };
   const langName = languageNames[language] || "português";
+  const contextSection = context
+    ? `\nTerms, names and keywords that MUST be preserved exactly: ${context}\n`
+    : "";
 
   const prompt = `You are an expert transcription editor. You received an automatic audio transcription in ${langName} produced by Whisper AI. Your task is to produce a clean, professional version suitable for reports and documentation.
-
+${contextSection}
 Rules:
 - Fix speech recognition errors (wrong words, homophones, invented words)
 - Remove filler words (uh, um, like, you know, né, então, tipo) and false starts
 - Fix punctuation, capitalization and paragraph breaks
-- Preserve technical terms, proper names and numbers exactly as spoken
+- Preserve technical terms, proper names, brand names and numbers exactly as spoken
 - Keep the original speaker's meaning — do not add, remove or change facts
 - Output ONLY the corrected text, no explanations, no headers
 
@@ -230,7 +254,8 @@ const convertToOgg = (inputPath, outputPath) =>
   new Promise((resolve, reject) => {
     const proc = spawn(ffmpegPath, [
       "-i", inputPath, "-vn",
-      "-c:a", "libvorbis", "-qscale:a", "2",
+      "-af", "loudnorm",
+      "-c:a", "libvorbis", "-qscale:a", "3",
       "-ar", "16000", "-ac", "1",
       "-y", outputPath
     ]);
@@ -272,9 +297,10 @@ const transcribeWithGroqWhisper = async (inputPath, language, context, apiKey = 
 
     const form = new FormData();
     form.append("file", new Blob([fileBuffer], { type: "audio/ogg" }), "audio.ogg");
-    form.append("model", "whisper-large-v3-turbo");
+    form.append("model", "whisper-large-v3");
     form.append("response_format", "text");
     form.append("prompt", promptText);
+    form.append("temperature", "0");
     if (language && whisperLanguageMap[language]) {
       form.append("language", whisperLanguageMap[language]);
     }
@@ -321,7 +347,7 @@ const processJob = async (job, uploadedFiles, relativePaths, language, includeTi
       }
 
       const cleanedText = cleanTranscription(rawText);
-      const resultText  = await refineWithGroq(cleanedText, language, groqApiKey);
+      const resultText  = await refineWithGroq(cleanedText, language, groqApiKey, context);
 
       job.results.push({
         fileName:   file.originalname,
@@ -442,12 +468,14 @@ app.use(express.static(publicDir, { etag: false, maxAge: 0 }));
 // ── Settings ──────────────────────────────────────────────────
 
 app.get("/api/settings", (req, res) => {
-  const key   = process.env.GROQ_API_KEY      || "";
-  const token = process.env.DISCORD_BOT_TOKEN || "";
+  const key      = process.env.GROQ_API_KEY      || "";
+  const token    = process.env.DISCORD_BOT_TOKEN || "";
+  const clientId = process.env.DISCORD_CLIENT_ID || "";
   res.json({
     hasGroqKey:        key.length > 0,
     maskedKey:         key.length > 8 ? `${key.slice(0, 8)}...` : null,
     hasDiscordToken:   token.length > 0,
+    discordClientId:   clientId,
     recorderAvailable: true
   });
 });
@@ -469,6 +497,10 @@ app.post("/api/settings", async (req, res) => {
   if (typeof discordBotToken === "string" && discordBotToken.trim()) {
     process.env.DISCORD_BOT_TOKEN = discordBotToken.trim();
     updated.discordBotToken       = discordBotToken.trim();
+  }
+  // Always preserve the client ID from env if not already saved
+  if (!updated.discordClientId && process.env.DISCORD_CLIENT_ID) {
+    updated.discordClientId = process.env.DISCORD_CLIENT_ID;
   }
 
   await saveSettings(updated);
@@ -531,7 +563,8 @@ app.post("/api/recorder/stop", async (req, res) => {
     const job = {
       id: crypto.randomUUID(), status: "queued",
       totalFiles: uploadedFiles.length, completedFiles: 0,
-      currentFile: null, startedAt: null,
+      currentFile: null, startedAt: null, createdAt: Date.now(),
+      language, source: "recorder",
       error: null, resultText: "", results: [], savedAt: null
     };
 
@@ -570,10 +603,12 @@ app.post("/api/transcrever", upload.array("media", 20), async (req, res) => {
   const modelExists    = await fs.access(path.join(whisperModelsDir, requestedModel)).then(() => true).catch(() => false);
   const modelFile      = modelExists ? requestedModel : "ggml-tiny.bin";
 
+  const source = relativePaths.some(p => p.includes("/")) ? "craig" : "files";
   const job = {
     id: crypto.randomUUID(), status: "queued",
     totalFiles: uploadedFiles.length, completedFiles: 0,
-    currentFile: null, startedAt: null,
+    currentFile: null, startedAt: null, createdAt: Date.now(),
+    language, source,
     error: null, resultText: "", results: [], savedAt: null
   };
 
@@ -587,6 +622,25 @@ app.get("/api/transcrever/:jobId", (req, res) => {
   const job = jobs.get(req.params.jobId);
   if (!job) return res.status(404).json({ error: "Transcription job not found." });
   return res.json(serializeJob(job));
+});
+
+// ── History ───────────────────────────────────────────────
+
+app.get("/api/historico", (req, res) => {
+  const list = [...jobs.values()]
+    .filter(j => j.status === "completed" || j.status === "failed")
+    .sort((a, b) => (b.createdAt || b.savedAt || 0) - (a.createdAt || a.savedAt || 0))
+    .map(j => ({
+      id: j.id,
+      status: j.status,
+      createdAt: j.createdAt || j.savedAt || null,
+      language: j.language || "portuguese",
+      source: j.source || "files",
+      totalFiles: j.totalFiles,
+      resultText: j.resultText || "",
+      error: j.error || null,
+    }));
+  res.json(list);
 });
 
 // ── Error handler ─────────────────────────────────────────────

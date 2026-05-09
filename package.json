@@ -36,10 +36,12 @@
     },
     "files": [
       "main.js",
+      "preload.js",
       "server.js",
       "recorder.js",
       "loading.html",
       "error.html",
+      "default-settings.json",
       "public/**/*",
       "scripts/**/*",
       "package.json",
@@ -50,6 +52,7 @@
     "asarUnpack": [
       "server.js",
       "recorder.js",
+      "default-settings.json",
       "public/**/*",
       "node_modules/**/*"
     ],
